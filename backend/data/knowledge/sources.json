@@ -1,0 +1,98 @@
+[
+  {
+    "source_url": "https://www.mongodb.com/docs/atlas/troubleshoot-connection/",
+    "fetch_url": "https://www.mongodb.com/docs/atlas/troubleshoot-connection.md?allTabs=true",
+    "product": "mongodb-atlas", "deployment": "atlas", "version_scope": "current-unversioned",
+    "category": "Connectivity", "topics": ["connection-errors", "dns", "tls", "authentication"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/atlas/security/ip-access-list/",
+    "fetch_url": "https://www.mongodb.com/docs/atlas/security/ip-access-list.md?allTabs=true",
+    "product": "mongodb-atlas", "deployment": "atlas", "version_scope": "current-unversioned",
+    "category": "Connectivity", "topics": ["network-access", "ip-access-list", "firewall"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/atlas/security-add-mongodb-users/",
+    "fetch_url": "https://www.mongodb.com/docs/atlas/security-add-mongodb-users.md?allTabs=true",
+    "product": "mongodb-atlas", "deployment": "atlas", "version_scope": "current-unversioned",
+    "category": "Authentication", "topics": ["database-users", "roles", "credentials"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/atlas/driver-connection/",
+    "fetch_url": "https://www.mongodb.com/docs/atlas/driver-connection.md?allTabs=true",
+    "product": "mongodb-atlas", "deployment": "atlas", "version_scope": "current-unversioned",
+    "category": "Connectivity", "topics": ["drivers", "connection-strings", "connect-to-cluster"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/reference/connection-string/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/reference/connection-string.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Connectivity", "topics": ["connection-strings", "srv", "percent-encoding"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/reference/connection-string-options/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/reference/connection-string-options.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Connectivity", "topics": ["authSource", "timeouts", "connection-pools", "tls"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/core/security-scram/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/core/security-scram.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Authentication", "topics": ["scram", "authentication", "credentials"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/tutorial/authenticate-a-user/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/tutorial/authenticate-a-user.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "self-managed", "version_scope": "8.0",
+    "category": "Authentication", "topics": ["mongosh", "authentication-database", "db.auth"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/tutorial/evaluate-operation-performance/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/tutorial/evaluate-operation-performance.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Performance", "topics": ["slow-queries", "query-analysis", "explain"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/core/query-optimization/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/core/query-optimization.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Performance", "topics": ["query-optimization", "covered-queries", "projections"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/reference/explain-results/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/reference/explain-results.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Performance", "topics": ["explain", "COLLSCAN", "IXSCAN", "executionStats"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/core/indexes/index-types/index-compound/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/core/indexes/index-types/index-compound.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Performance", "topics": ["compound-indexes", "index-prefixes", "field-order"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/tutorial/equality-sort-range-guideline/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/tutorial/equality-sort-range-guideline.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Performance", "topics": ["index-design", "equality-sort-range", "sorting"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/core/index-unique/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/core/index-unique.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Performance", "topics": ["unique-indexes", "duplicate-key", "E11000"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/tutorial/create-indexes-to-support-queries/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/tutorial/create-indexes-to-support-queries.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Performance", "topics": ["createIndex", "query-indexes", "index-design"]
+  },
+  {
+    "source_url": "https://www.mongodb.com/docs/v8.0/core/retryable-writes/",
+    "fetch_url": "https://www.mongodb.com/docs/v8.0/core/retryable-writes.md?allTabs=true",
+    "product": "mongodb-server", "deployment": "atlas-and-self-managed", "version_scope": "8.0",
+    "category": "Connectivity", "topics": ["retryable-writes", "replica-sets", "network-errors"]
+  }
+]
