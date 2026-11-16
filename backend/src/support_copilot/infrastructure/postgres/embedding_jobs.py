@@ -50,6 +50,18 @@ def finish(conn, job_id, status):
     )
 
 
+def finish_owned(conn, job, status):
+    updated = conn.execute(
+        """UPDATE embedding_jobs SET status=%s,claim_token=NULL,lease_expires_at=NULL,
+        updated_at=clock_timestamp(),finished_at=clock_timestamp()
+        WHERE id=%s AND status='processing' AND claim_token=%s AND lease_expires_at>clock_timestamp()
+        RETURNING id""",
+        (status, job.id, job.claim_token),
+    ).fetchone()
+    if not updated:
+        raise OwnershipLost()
+
+
 class PostgresEmbeddingStore:
     def __init__(self, dsn: str, *, lease_seconds: int = 300, max_attempts: int = 3):
         self.db = Database(dsn)
@@ -150,7 +162,7 @@ class PostgresEmbeddingStore:
         with self.db.transaction() as conn:
             document, row = lock_owned(conn, job)
             if not current(document, row):
-                finish(conn, job.id, "superseded")
+                finish_owned(conn, job, "superseded")
                 return False
             return True
 
@@ -160,7 +172,7 @@ class PostgresEmbeddingStore:
         with self.db.transaction() as conn:
             document, row = lock_owned(conn, job)
             if not current(document, row):
-                finish(conn, job.id, "superseded")
+                finish_owned(conn, job, "superseded")
                 return "superseded"
             status = (
                 "pending"
@@ -168,13 +180,17 @@ class PostgresEmbeddingStore:
                 else "failed"
             )
             delay = min(60 * 2 ** min(row["attempts"] - 1, 6), 3600)
-            conn.execute(
+            updated = conn.execute(
                 """UPDATE embedding_jobs SET status=%s,claim_token=NULL,lease_expires_at=NULL,
                 last_error_code=%s,last_error=%s,updated_at=clock_timestamp(),
                 available_at=clock_timestamp()+(%s * interval '1 second'),
-                finished_at=CASE WHEN %s='failed' THEN clock_timestamp() ELSE NULL END WHERE id=%s""",
-                (status, safe_code, safe_code, delay, status, job.id),
-            )
+                finished_at=CASE WHEN %s='failed' THEN clock_timestamp() ELSE NULL END
+                WHERE id=%s AND status='processing' AND claim_token=%s AND lease_expires_at>clock_timestamp()
+                RETURNING id""",
+                (status, safe_code, safe_code, delay, status, job.id, job.claim_token),
+            ).fetchone()
+            if not updated:
+                raise OwnershipLost()
             return status
 
     def observe(self, config_hash: str, cutoff: datetime) -> QueueObservation:

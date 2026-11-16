@@ -90,6 +90,7 @@ def test_retry_only_current_failed_target(db, config):
     job = store.claim(config.config_hash, store.now())
     with pytest.raises(ProcessingError):
         store.retry_failed(job.id)
+
     assert store.fail(job, "invalid_source", False) == "failed"
     assert store.admit(config, None).unchanged == 1
     store.retry_failed(job.id)
@@ -100,3 +101,12 @@ def test_retry_only_current_failed_target(db, config):
     store.admit(config, None)
     with pytest.raises(ProcessingError):
         store.retry_failed(job.id)
+
+
+def test_later_staging_import_does_not_mutate_admitted_snapshot(db, config):
+    store = KnowledgeRepository(db)
+    stage(db, "Admitted")
+    store.admit(config, None)
+    job = store.claim(config.config_hash, store.now())
+    stage(db, "Still staged")
+    assert store.load_snapshot(job)["content_markdown"] == "# Help\n\nAdmitted"

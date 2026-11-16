@@ -108,3 +108,47 @@ def test_constraints_and_registry_immutability(db, config):
         conn.execute(
             "UPDATE embedding_models SET dimensions=4 WHERE id=%s", (config.model_id,)
         )
+
+
+def test_later_lease_expiry_waits_for_next_invocation(db, config):
+    from threading import Event
+
+    seed(db, config)
+    store = PostgresEmbeddingStore(db)
+    job = store.claim(config.config_hash, store.now())
+    cutoff = store.now()
+    with psycopg.connect(db) as conn:
+        conn.execute(
+            "UPDATE embedding_jobs SET lease_expires_at=%s+interval '0.02 seconds' WHERE id=%s",
+            (cutoff, job.id),
+        )
+    Event().wait(0.03)
+    assert store.recover(cutoff).recovered == 0
+    assert store.recover(store.now()).recovered == 1
+    again = store.claim(config.config_hash, store.now())
+    assert again.claim_token != job.claim_token
+
+
+def test_failure_transition_rechecks_lease_after_transaction_delay(
+    db, config, monkeypatch
+):
+    from support_copilot.infrastructure.postgres import embedding_jobs
+
+    seed(db, config)
+    store = PostgresEmbeddingStore(db)
+    job = store.claim(config.config_hash, store.now())
+    with psycopg.connect(db) as conn:
+        conn.execute(
+            "UPDATE embedding_jobs SET lease_expires_at=now()+interval '0.3 seconds' WHERE id=%s",
+            (job.id,),
+        )
+    original = embedding_jobs.lock_owned
+
+    def delayed(conn, claimed):
+        result = original(conn, claimed)
+        conn.execute("SELECT pg_sleep(0.5)")
+        return result
+
+    monkeypatch.setattr(embedding_jobs, "lock_owned", delayed)
+    with pytest.raises(OwnershipLost):
+        store.fail(job, "encoding_resource", True)

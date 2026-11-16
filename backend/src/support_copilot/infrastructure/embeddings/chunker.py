@@ -14,7 +14,9 @@ class TokenAwareChunker:
         # fetch_url is transport-only and may be absent in a promoted payload.
         document = {"fetch_url": snapshot["source_url"], **snapshot}
         try:
-            prepared = chunk_document(document, target_chars=config.target_chars)
+            prepared = chunk_document(
+                document, target_chars=config.target_chars, preserve_whitespace=True
+            )
         except (KeyError, ValueError):
             raise ProcessingError("invalid_source") from None
         if not prepared:

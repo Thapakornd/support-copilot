@@ -1,5 +1,7 @@
 """Bounded document preparation and inference; the store owns atomic publication."""
 
+import json
+import logging
 from collections.abc import Callable
 
 from support_copilot.application.ports import (
@@ -12,6 +14,8 @@ from support_copilot.domain.embedding_job import (
     ProcessingError,
     validate_vectors,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def process_job(
@@ -28,6 +32,20 @@ def process_job(
     if not store.is_current(job):
         return "superseded"
     chunks = chunker.chunks(store.load_snapshot(job), job.config, encoder)
+    logger.info(
+        json.dumps(
+            {
+                "event": "prepared",
+                "job_id": str(job.id),
+                "document_id": job.document_id,
+                "revision_id": str(job.revision_id),
+                "generation": job.generation,
+                "config_hash": job.config.config_hash,
+                "attempt": job.attempts,
+                "chunk_count": len(chunks),
+            }
+        )
+    )
     vectors = []
     for start in range(0, len(chunks), batch_size):
         if stopped():

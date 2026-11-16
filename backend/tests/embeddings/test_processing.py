@@ -106,3 +106,18 @@ def test_vectors_reject_incomplete_or_invalid_outputs(vectors):
 
 def test_normalized_vectors_are_accepted():
     validate_vectors([[0.6, 0.8, 0.0]], 1, 3)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "a" * 89 + "   " + "b" * 50,
+        "a" * 92 + "\u2003\t" + "b" * 50,
+        "a" * 89 + "   \n    " + "b" * 50,
+    ],
+)
+def test_character_preparation_preserves_spaces_at_split_boundaries(body):
+    chunks = TokenAwareChunker().chunks(
+        snapshot("# Help\n\n" + body), config(target_chars=100), CharacterEncoder()
+    )
+    assert "".join(chunk["text"].removeprefix("# Help\n\n") for chunk in chunks) == body

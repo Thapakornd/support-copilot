@@ -111,18 +111,24 @@ def prepare_document(source: dict, markdown: str, fetched_at: str) -> dict:
     }
 
 
-def _split_text(text: str, budget: int):
+def _split_text(text: str, budget: int, *, preserve_whitespace: bool = False):
     while len(text) > budget:
         boundary = text.rfind(" ", 0, budget + 1)
         if boundary < budget // 2:
             boundary = budget
-        yield text[:boundary].rstrip()
-        text = text[boundary:].lstrip()
+        if preserve_whitespace:
+            yield text[:boundary]
+            text = text[boundary:]
+        else:
+            yield text[:boundary].rstrip()
+            text = text[boundary:].lstrip()
     if text:
         yield text
 
 
-def chunk_document(document: dict, target_chars: int = 2400) -> list[dict]:
+def chunk_document(
+    document: dict, target_chars: int = 2400, *, preserve_whitespace: bool = False
+) -> list[dict]:
     """Split sections by characters; keep fences/tables whole even when oversized.
 
     This is deliberately not a token count. Heading context is repeated in text,
@@ -169,7 +175,13 @@ def chunk_document(document: dict, target_chars: int = 2400) -> list[dict]:
             headings = [(n, t) for n, t in headings if n < level] + [(level, title)]
             continue
         budget = max(1, target_chars - len(prefix()) - 2)
-        pieces = [block] if indivisible else list(_split_text(block, budget))
+        pieces = (
+            [block]
+            if indivisible
+            else list(
+                _split_text(block, budget, preserve_whitespace=preserve_whitespace)
+            )
+        )
         for piece in pieces:
             if pending and len("\n\n".join([*pending, piece])) > budget:
                 flush()

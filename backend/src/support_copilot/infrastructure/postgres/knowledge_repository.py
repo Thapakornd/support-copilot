@@ -35,7 +35,7 @@ class KnowledgeRepository(PostgresEmbeddingStore):
     def publish(self, job, chunks, vectors):
         from support_copilot.domain.embedding_job import OwnershipLost, validate_vectors
         from support_copilot.infrastructure.postgres.embedding_jobs import (
-            finish,
+            finish_owned,
             lock_owned,
         )
 
@@ -52,7 +52,7 @@ class KnowledgeRepository(PostgresEmbeddingStore):
         with self.db.transaction() as conn:
             document, row = lock_owned(conn, job)
             if not current(document, row):
-                finish(conn, job.id, "superseded")
+                finish_owned(conn, job, "superseded")
                 return "superseded"
             if row["config_hash"] != job.config.config_hash:
                 raise ProcessingError("configuration_mismatch")

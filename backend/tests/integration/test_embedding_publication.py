@@ -33,7 +33,10 @@ def test_lease_expiring_during_publication_rolls_back(db, config):
     store.admit(config, None)
     job = store.claim(config.config_hash, store.now())
     with psycopg.connect(db) as conn:
-        conn.execute("UPDATE embedding_jobs SET lease_expires_at=now()+interval '0.3 seconds' WHERE id=%s", (job.id,))
+        conn.execute(
+            "UPDATE embedding_jobs SET lease_expires_at=now()+interval '0.3 seconds' WHERE id=%s",
+            (job.id,),
+        )
         conn.execute("""CREATE FUNCTION slow_publication() RETURNS trigger LANGUAGE plpgsql AS $$
             BEGIN PERFORM pg_sleep(0.5); RETURN NEW; END $$;
             CREATE TRIGGER slow_publication BEFORE INSERT ON retrieval_publications
