@@ -53,3 +53,20 @@ def db(request):
             admin.execute(
                 sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name))
             )
+
+
+from support_copilot.domain.embedding_job import EmbeddingConfig
+
+
+@pytest.fixture
+def config(db):
+    config = EmbeddingConfig(
+        uuid4(), "approved/test", "a" * 40, 3, 128, "passage: ", "query: "
+    )
+    with psycopg.connect(db) as conn:
+        conn.execute(
+            "INSERT INTO embedding_models VALUES (%s,'sentence-transformers',%s,%s,3,'cosine',true)",
+            (config.model_id, config.model_name, config.model_revision),
+        )
+    return config
+
