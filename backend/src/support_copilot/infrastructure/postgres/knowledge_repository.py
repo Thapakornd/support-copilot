@@ -22,6 +22,124 @@ logger = logging.getLogger(__name__)
 
 
 class KnowledgeRepository(PostgresEmbeddingStore):
+    def load_snapshot(self, job):
+        with self.db.transaction() as conn:
+            row = conn.execute(
+                "SELECT source_payload FROM knowledge_document_revisions WHERE id=%s AND document_id=%s",
+                (job.revision_id, job.document_id),
+            ).fetchone()
+            if not row:
+                raise ProcessingError("invalid_source")
+            return row["source_payload"]
+
+    def publish(self, job, chunks, vectors):
+        from support_copilot.domain.embedding_job import OwnershipLost, validate_vectors
+        from support_copilot.infrastructure.postgres.embedding_jobs import (
+            finish,
+            lock_owned,
+        )
+
+        validate_vectors(vectors, len(chunks), job.config.dimensions)
+        if (
+            [chunk["chunk_index"] for chunk in chunks] != list(range(len(chunks)))
+            or len({chunk["chunk_id"] for chunk in chunks}) != len(chunks)
+            or any(
+                not chunk["text"].strip() or chunk["char_count"] != len(chunk["text"])
+                for chunk in chunks
+            )
+        ):
+            raise ProcessingError("vector_coverage")
+        with self.db.transaction() as conn:
+            document, row = lock_owned(conn, job)
+            if not current(document, row):
+                finish(conn, job.id, "superseded")
+                return "superseded"
+            if row["config_hash"] != job.config.config_hash:
+                raise ProcessingError("configuration_mismatch")
+            validate_configuration(conn, job.config)
+            chunk_set_id = uuid4()
+            conn.execute(
+                """INSERT INTO knowledge_chunk_sets(id,revision_id,chunker_version,config_hash,state)
+                VALUES (%s,%s,%s,%s,'preparing') ON CONFLICT(revision_id,chunker_version,config_hash) DO NOTHING""",
+                (
+                    chunk_set_id,
+                    job.revision_id,
+                    job.config.chunker_version,
+                    job.config.config_hash,
+                ),
+            )
+            chunk_set_id = conn.execute(
+                "SELECT id FROM knowledge_chunk_sets WHERE revision_id=%s AND chunker_version=%s AND config_hash=%s FOR UPDATE",
+                (job.revision_id, job.config.chunker_version, job.config.config_hash),
+            ).fetchone()["id"]
+            for chunk, vector in zip(chunks, vectors, strict=True):
+                conn.execute(
+                    """INSERT INTO knowledge_chunks(chunk_set_id,chunk_id,chunk_index,heading_path,text,char_count,oversized)
+                    VALUES (%s,%s,%s,%s,%s,%s,false) ON CONFLICT(chunk_set_id,chunk_id) DO NOTHING""",
+                    (
+                        chunk_set_id,
+                        chunk["chunk_id"],
+                        chunk["chunk_index"],
+                        chunk["heading_path"],
+                        chunk["text"],
+                        len(chunk["text"]),
+                    ),
+                )
+                conn.execute(
+                    """INSERT INTO chunk_embeddings(chunk_set_id,chunk_id,model_id,embedding)
+                    VALUES (%s,%s,%s,%s::vector) ON CONFLICT(chunk_set_id,chunk_id,model_id) DO NOTHING""",
+                    (
+                        chunk_set_id,
+                        chunk["chunk_id"],
+                        job.config.model_id,
+                        "[" + ",".join(str(float(v)) for v in vector) + "]",
+                    ),
+                )
+            stored = conn.execute(
+                """SELECT c.chunk_id,c.chunk_index,c.text,c.heading_path,e.embedding::text AS embedding
+                FROM knowledge_chunks c LEFT JOIN chunk_embeddings e ON e.chunk_set_id=c.chunk_set_id
+                AND e.chunk_id=c.chunk_id AND e.model_id=%s WHERE c.chunk_set_id=%s ORDER BY c.chunk_index""",
+                (job.config.model_id, chunk_set_id),
+            ).fetchall()
+            if len(stored) != len(chunks) or any(
+                existing["chunk_id"] != expected["chunk_id"]
+                or existing["text"] != expected["text"]
+                or existing["heading_path"] != expected["heading_path"]
+                or existing["embedding"] is None
+                for existing, expected in zip(stored, chunks, strict=True)
+            ):
+                raise ProcessingError("vector_coverage")
+            validate_vectors(
+                [json.loads(item["embedding"]) for item in stored],
+                len(chunks),
+                job.config.dimensions,
+            )
+            # Late fencing rolls back all artifacts if the lease expired during writes.
+            owned = conn.execute(
+                """UPDATE embedding_jobs SET status='completed',claim_token=NULL,
+                lease_expires_at=NULL,updated_at=clock_timestamp(),finished_at=clock_timestamp()
+                WHERE id=%s AND status='processing' AND claim_token=%s AND lease_expires_at>clock_timestamp()
+                RETURNING id""",
+                (job.id, job.claim_token),
+            ).fetchone()
+            if not owned:
+                raise OwnershipLost()
+            conn.execute(
+                "UPDATE knowledge_chunk_sets SET state='ready' WHERE id=%s",
+                (chunk_set_id,),
+            )
+            conn.execute(
+                """INSERT INTO retrieval_publications(document_id,chunk_set_id,model_id,published_at)
+                VALUES (%s,%s,%s,clock_timestamp()) ON CONFLICT(document_id) DO UPDATE SET
+                chunk_set_id=EXCLUDED.chunk_set_id,model_id=EXCLUDED.model_id,published_at=EXCLUDED.published_at""",
+                (job.document_id, chunk_set_id, job.config.model_id),
+            )
+            conn.execute(
+                "UPDATE knowledge_documents SET current_revision_id=%s,updated_at=clock_timestamp() WHERE document_id=%s",
+                (job.revision_id, job.document_id),
+            )
+            return "completed"
+
     def admit(self, config, document_ids=None):
         with self.db.transaction() as conn:
             validate_configuration(conn, config)

@@ -101,9 +101,10 @@ def test_constraints_and_registry_immutability(db, config):
     seed(db, config)
     with psycopg.connect(db) as conn, pytest.raises(psycopg.errors.CheckViolation):
         conn.execute("UPDATE embedding_jobs SET status='processing'")
-    with psycopg.connect(db) as conn:
-        with pytest.raises(psycopg.errors.ObjectNotInPrerequisiteState):
-            conn.execute(
-                "UPDATE embedding_models SET dimensions=4 WHERE id=%s",
-                (config.model_id,),
-            )
+    with (
+        psycopg.connect(db) as conn,
+        pytest.raises(psycopg.errors.ObjectNotInPrerequisiteState),
+    ):
+        conn.execute(
+            "UPDATE embedding_models SET dimensions=4 WHERE id=%s", (config.model_id,)
+        )
