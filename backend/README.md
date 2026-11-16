@@ -1,5 +1,12 @@
 # Support Copilot backend
 
+## Incremental embedding worker
+
+See [embedding worker setup and operations](docs/embedding-worker.md) for schema
+prerequisites, pinned offline model configuration, explicit admission, run-once
+processing, recovery and isolated integration tests. Imports remain staging-only;
+the worker does not change the chat retrieval path or install a daily schedule.
+
 ## Prepare the demo knowledge dataset
 
 The file-only ingestion command downloads a curated set of **official MongoDB
