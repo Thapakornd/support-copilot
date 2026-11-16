@@ -69,4 +69,3 @@ def config(db):
             (config.model_id, config.model_name, config.model_revision),
         )
     return config
-

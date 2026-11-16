@@ -114,16 +114,6 @@ class KnowledgeRepository(PostgresEmbeddingStore):
                 len(chunks),
                 job.config.dimensions,
             )
-            # Late fencing rolls back all artifacts if the lease expired during writes.
-            owned = conn.execute(
-                """UPDATE embedding_jobs SET status='completed',claim_token=NULL,
-                lease_expires_at=NULL,updated_at=clock_timestamp(),finished_at=clock_timestamp()
-                WHERE id=%s AND status='processing' AND claim_token=%s AND lease_expires_at>clock_timestamp()
-                RETURNING id""",
-                (job.id, job.claim_token),
-            ).fetchone()
-            if not owned:
-                raise OwnershipLost()
             conn.execute(
                 "UPDATE knowledge_chunk_sets SET state='ready' WHERE id=%s",
                 (chunk_set_id,),
@@ -138,6 +128,16 @@ class KnowledgeRepository(PostgresEmbeddingStore):
                 "UPDATE knowledge_documents SET current_revision_id=%s,updated_at=clock_timestamp() WHERE document_id=%s",
                 (job.revision_id, job.document_id),
             )
+            # Late fencing rolls back all artifacts if the lease expired during writes.
+            owned = conn.execute(
+                """UPDATE embedding_jobs SET status='completed',claim_token=NULL,
+                lease_expires_at=NULL,updated_at=clock_timestamp(),finished_at=clock_timestamp()
+                WHERE id=%s AND status='processing' AND claim_token=%s AND lease_expires_at>clock_timestamp()
+                RETURNING id""",
+                (job.id, job.claim_token),
+            ).fetchone()
+            if not owned:
+                raise OwnershipLost()
             return "completed"
 
     def admit(self, config, document_ids=None):

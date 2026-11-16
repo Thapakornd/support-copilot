@@ -22,3 +22,32 @@ def build_embedding_admission():
         max_attempts=config.max_attempts,
     )
     return store, config.effective_config()
+
+
+def build_embedding_worker():
+    from support_copilot.core.config import WorkerSettings
+    from support_copilot.infrastructure.embeddings.chunker import TokenAwareChunker
+    from support_copilot.infrastructure.embeddings.sentence_transformer import (
+        SentenceTransformerEncoder,
+    )
+    from support_copilot.infrastructure.postgres.knowledge_repository import (
+        KnowledgeRepository,
+    )
+
+    runtime = WorkerSettings()
+    config = runtime.effective_config()
+    store = KnowledgeRepository(
+        runtime.database_url.get_secret_value(),
+        lease_seconds=runtime.lease_seconds,
+        max_attempts=runtime.max_attempts,
+    )
+
+    def encoder_factory():
+        return SentenceTransformerEncoder(
+            config,
+            device=runtime.device,
+            batch_size=runtime.batch_size,
+            offline=runtime.offline,
+        )
+
+    return store, encoder_factory, TokenAwareChunker(), runtime

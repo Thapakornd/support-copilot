@@ -22,6 +22,7 @@ support-copilot = "support_copilot:main"
 support-copilot-prepare-knowledge = "support_copilot.knowledge.cli:main"
 support-copilot-import-documents = "support_copilot.knowledge.import_documents:main"
 support-copilot-enqueue-embeddings = "support_copilot.interface.worker.enqueue:main"
+support-copilot-worker = "support_copilot.interface.worker.main:main"
 
 [project.optional-dependencies]
 embeddings = [
