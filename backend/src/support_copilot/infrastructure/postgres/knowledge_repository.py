@@ -74,7 +74,7 @@ class KnowledgeRepository(PostgresEmbeddingStore):
             ).fetchone()["id"]
             for chunk, vector in zip(chunks, vectors, strict=True):
                 conn.execute(
-                    """INSERT INTO knowledge_chunks(chunk_set_id,chunk_id,chunk_index,heading_path,text,char_count,oversized)
+                    """INSERT INTO knowledge_revision_chunks(chunk_set_id,chunk_id,chunk_index,heading_path,text,char_count,oversized)
                     VALUES (%s,%s,%s,%s,%s,%s,false) ON CONFLICT(chunk_set_id,chunk_id) DO NOTHING""",
                     (
                         chunk_set_id,
@@ -97,7 +97,7 @@ class KnowledgeRepository(PostgresEmbeddingStore):
                 )
             stored = conn.execute(
                 """SELECT c.chunk_id,c.chunk_index,c.text,c.heading_path,e.embedding::text AS embedding
-                FROM knowledge_chunks c LEFT JOIN chunk_embeddings e ON e.chunk_set_id=c.chunk_set_id
+                FROM knowledge_revision_chunks c LEFT JOIN chunk_embeddings e ON e.chunk_set_id=c.chunk_set_id
                 AND e.chunk_id=c.chunk_id AND e.model_id=%s WHERE c.chunk_set_id=%s ORDER BY c.chunk_index""",
                 (job.config.model_id, chunk_set_id),
             ).fetchall()

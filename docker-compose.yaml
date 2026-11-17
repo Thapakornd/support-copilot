@@ -1,4 +1,5 @@
 services:
+  # Optional local development database, configured independently of backend/.env.
   postgres:
     image: pgvector/pgvector:0.8.7-pg16-trixie
     restart: unless-stopped
@@ -11,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U support_copilot -d support_copilot"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 10

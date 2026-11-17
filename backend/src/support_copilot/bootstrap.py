@@ -6,7 +6,13 @@ from support_copilot.infrastructure.langchain.llm import LangChainLLM
 
 
 def build_answer_question() -> AnswerQuestion:
-    return AnswerQuestion(LangChainLLM(settings.llm_model))
+    return AnswerQuestion(
+        LangChainLLM(
+            settings.llm_model,
+            provider=settings.llm_provider,
+            api_key=settings.anthropic_api_key.get_secret_value(),
+        )
+    )
 
 
 def build_embedding_admission():

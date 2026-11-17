@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv
 .env
+.pytest-tmp/
 
 # Downloaded documentation snapshots and generated import datasets
 /data/knowledge/output/

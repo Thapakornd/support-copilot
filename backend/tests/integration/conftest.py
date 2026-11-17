@@ -29,6 +29,15 @@ def db(request):
                 conn.execute(
                     "INSERT INTO knowledge_documents VALUES ('legacy-staging','{\"kept\":true}')"
                 )
+                conn.execute(
+                    """CREATE TABLE knowledge_chunks (
+                    chunk_id text PRIMARY KEY, document_id text NOT NULL,
+                    data jsonb NOT NULL)"""
+                )
+                conn.execute(
+                    """INSERT INTO knowledge_chunks VALUES
+                    ('legacy-chunk','legacy-staging','{"text":"scraped content"}')"""
+                )
             conn.execute((root / "001_schema.sql").read_text())
             conn.execute((root / "003_seed_reference.sql").read_text())
             conn.execute("CREATE EXTENSION vector")
@@ -38,12 +47,25 @@ def db(request):
                 model_id uuid NOT NULL REFERENCES embedding_models,
                 embedding vector(3) NOT NULL, created_at timestamptz DEFAULT now(),
                 PRIMARY KEY(chunk_set_id, chunk_id, model_id),
-                FOREIGN KEY(chunk_set_id, chunk_id) REFERENCES knowledge_chunks)""")
+                FOREIGN KEY(chunk_set_id, chunk_id) REFERENCES knowledge_revision_chunks)""")
             conn.execute((root / "004_embedding_jobs.sql").read_text())
             if request.param:
                 assert conn.execute(
                     "SELECT data FROM knowledge_documents WHERE document_id='legacy-staging'"
                 ).fetchone()[0] == {"kept": True}
+                assert conn.execute(
+                    "SELECT document_id,data FROM knowledge_chunks WHERE chunk_id='legacy-chunk'"
+                ).fetchone() == ("legacy-staging", {"text": "scraped content"})
+                # The scraper can still upsert its original chunk shape after DDL.
+                conn.execute(
+                    """INSERT INTO knowledge_chunks(chunk_id,document_id,data)
+                    VALUES ('legacy-chunk','legacy-staging','{"text":"refreshed"}')
+                    ON CONFLICT(chunk_id) DO UPDATE SET data=EXCLUDED.data"""
+                )
+                assert conn.execute(
+                    "SELECT data FROM knowledge_chunks WHERE chunk_id='legacy-chunk'"
+                ).fetchone()[0] == {"text": "refreshed"}
+                conn.execute("DELETE FROM knowledge_chunks WHERE chunk_id='legacy-chunk'")
                 conn.execute(
                     "DELETE FROM knowledge_documents WHERE document_id='legacy-staging'"
                 )

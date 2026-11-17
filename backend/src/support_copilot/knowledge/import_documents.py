@@ -1,15 +1,17 @@
-"""Import full knowledge documents through the project's Docker PostgreSQL service."""
+"""Import full knowledge documents into the configured PostgreSQL database."""
 
 import argparse
-import csv
-import io
 import json
-import subprocess
 import sys
 from pathlib import Path
 
+import psycopg
+from psycopg.types.json import Jsonb
+from pydantic import ValidationError
+
+from support_copilot.core.config import Settings
+
 BACKEND_DIR = Path(__file__).resolve().parents[3]
-PROJECT_DIR = BACKEND_DIR.parent
 DEFAULT_FILE = BACKEND_DIR / "data" / "knowledge" / "output" / "documents.jsonl"
 REQUIRED_FIELDS = ("document_id", "title", "source_url", "content_markdown")
 
@@ -61,32 +63,6 @@ def load_documents(path: Path) -> list[dict]:
     return documents
 
 
-def build_sql(documents: list[dict]) -> str:
-    """CSV-encode JSON to preserve quotes, backslashes and Unicode through COPY."""
-    data = io.StringIO(newline="")
-    writer = csv.writer(data, lineterminator="\n")
-    for document in documents:
-        writer.writerow([json.dumps(document, ensure_ascii=True, allow_nan=False)])
-    return (
-        """BEGIN;
-CREATE TABLE IF NOT EXISTS public.knowledge_documents (
-    document_id TEXT PRIMARY KEY,
-    data JSONB NOT NULL
-);
-CREATE TEMP TABLE incoming_knowledge_documents (data JSONB NOT NULL) ON COMMIT DROP;
-COPY incoming_knowledge_documents(data) FROM STDIN WITH (FORMAT csv);
-"""
-        + data.getvalue()
-        + """\\.
-INSERT INTO public.knowledge_documents (document_id, data)
-SELECT data->>'document_id', data FROM incoming_knowledge_documents
-ON CONFLICT (document_id) DO UPDATE SET data = EXCLUDED.data;
-SELECT COUNT(*) AS documents_in_table FROM public.knowledge_documents;
-COMMIT;
-"""
-    )
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--file", type=Path, default=DEFAULT_FILE)
@@ -96,43 +72,42 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         documents = load_documents(args.file)
-        sql = build_sql(documents)
     except (OSError, ValueError) as exc:
         print(f"Document import: {exc}", file=sys.stderr)
         return 2
     if args.dry_run:
         print(f"Validated {len(documents)} documents; no database connection made.")
         return 0
-    command = [
-        "docker",
-        "compose",
-        "--file",
-        str(PROJECT_DIR / "docker-compose.yaml"),
-        "exec",
-        "-T",
-        "postgres",
-        "psql",
-        "-X",
-        "--username",
-        "support_copilot",
-        "--dbname",
-        "support_copilot",
-        "--set",
-        "ON_ERROR_STOP=1",
-    ]
     try:
-        result = subprocess.run(
-            command, input=sql, encoding="utf-8", cwd=PROJECT_DIR, check=False
-        )
-    except OSError:
+        database_url = Settings().database_url.get_secret_value()
+        if not database_url.strip():
+            print("Set DATABASE_URL in backend/.env before importing.", file=sys.stderr)
+            return 2
+    except ValidationError:
+        print("Invalid backend configuration; check backend/.env.", file=sys.stderr)
+        return 2
+    try:
+        # The connection context commits the entire import, or rolls it back on error.
+        with (
+            psycopg.connect(database_url, connect_timeout=10) as conn,
+            conn.cursor() as cursor,
+        ):
+            cursor.execute("""CREATE TABLE IF NOT EXISTS public.knowledge_documents (
+                document_id TEXT PRIMARY KEY,
+                data JSONB NOT NULL
+            )""")
+            cursor.executemany(
+                """INSERT INTO public.knowledge_documents (document_id, data)
+                VALUES (%s, %s)
+                ON CONFLICT (document_id) DO UPDATE SET data = EXCLUDED.data""",
+                [
+                    (document["document_id"], Jsonb(document))
+                    for document in documents
+                ],
+            )
+    except (psycopg.Error, OSError):
         print(
-            "Could not start Docker. Ensure Docker is installed and running.",
-            file=sys.stderr,
-        )
-        return 1
-    if result.returncode:
-        print(
-            "Import failed. The transaction was not committed. Check the psql/Docker error above.",
+            "Import failed; transaction not committed. Check DATABASE_URL, database connectivity and schema permissions.",
             file=sys.stderr,
         )
         return 1

@@ -28,7 +28,7 @@ an arbitrary differently versioned schema. Bootstrap never executes DDL.
 
 Use a migration owner for DDL; use a separate runtime role with schema usage and
 SELECT on categories/models, SELECT/UPDATE on knowledge_documents,
-SELECT/INSERT on knowledge_document_revisions, knowledge_chunks and chunk_embeddings,
+SELECT/INSERT on knowledge_document_revisions, knowledge_revision_chunks and chunk_embeddings,
 and SELECT/INSERT/UPDATE on knowledge_chunk_sets, retrieval_publications and embedding_jobs.
 Additionally grant `UPDATE(is_active)` on embedding_models: PostgreSQL requires an
 UPDATE privilege for the `FOR SHARE` row lock used to serialize model validation
@@ -41,11 +41,11 @@ GRANT USAGE ON SCHEMA public TO embedding_runtime;
 GRANT SELECT ON categories,embedding_models TO embedding_runtime;
 GRANT UPDATE(is_active) ON embedding_models TO embedding_runtime;
 GRANT SELECT,UPDATE ON knowledge_documents TO embedding_runtime;
-GRANT SELECT,INSERT ON knowledge_document_revisions,knowledge_chunks,chunk_embeddings TO embedding_runtime;
+GRANT SELECT,INSERT ON knowledge_document_revisions,knowledge_revision_chunks,chunk_embeddings TO embedding_runtime;
 GRANT SELECT,INSERT,UPDATE ON knowledge_chunk_sets,retrieval_publications,embedding_jobs TO embedding_runtime;
 ```
 
-The importer has its own existing database connection mechanism. UUIDs are
+The importer connects directly using the shared DATABASE_URL setting. UUIDs are
 application-generated; the worker requires no sequence or DDL privileges.
 
 Choose a model whose licensing, tokenizer, prompts and dimensions you have
@@ -58,10 +58,13 @@ scope. Never register placeholder models in production.
 
 ## Required environment
 
-Set these in the backend `.env` or process environment. Keep secrets out of logs:
+Set these in the backend `.env` or process environment. All commands resolve
+`backend/.env` independently of the working directory; process variables take precedence. Keep secrets out of logs:
 
 ```dotenv
-EMBEDDING_DATABASE_URL=postgresql://runtime_user:password@127.0.0.1:5432/support_copilot
+DATABASE_URL=postgresql://runtime_user:password@127.0.0.1:5432/support_copilot
+# Optional separate worker credentials; omit to use DATABASE_URL.
+# EMBEDDING_DATABASE_URL=postgresql://worker_user:password@127.0.0.1:5432/support_copilot
 EMBEDDING_MODEL_ID=<registered UUID>
 EMBEDDING_MODEL_NAME=<approved Hugging Face identifier>
 EMBEDDING_MODEL_REVISION=<40-character immutable upstream commit SHA>

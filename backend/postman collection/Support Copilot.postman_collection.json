@@ -1,0 +1,93 @@
+{
+  "info": {
+    "name": "Support Copilot",
+    "description": "Requests for the current Support Copilot API. Start the backend with `uv run support-copilot` from backend/. Set base_url to match API_HOST/API_PORT. Health requires no external services. Chat requires LLM_PROVIDER, LLM_MODEL, and ANTHROPIC_API_KEY in backend/.env; it does not use retrieval yet. No API authentication is currently required.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/health",
+        "description": "Check that the API is running. Expected response: 200 with {\"status\": \"ok\"}. This does not check the database or LLM."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Service is healthy', function () { pm.expect(pm.response.json()).to.eql({ status: 'ok' }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat - question only",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"Why does my MongoDB Atlas connection time out?\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/chat",
+        "description": "Send the required question field. The optional category defaults to null. Calls the configured LLM and may incur provider charges. Expected response: 200 with an answer string."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Response contains an answer string', function () { pm.expect(pm.response.json().answer).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat - with category",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"How can I troubleshoot a MongoDB Atlas connection timeout?\",\n  \"category\": \"Connectivity\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/chat",
+        "description": "Send a question with the optional category string. The current chat implementation does not use retrieval. Calls the configured LLM and may incur provider charges. Expected response: 200 with an answer string."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Response contains an answer string', function () { pm.expect(pm.response.json().answer).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

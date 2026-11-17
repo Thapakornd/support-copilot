@@ -2,7 +2,6 @@
 
 from support_copilot.domain.embedding_job import ProcessingError, validate_vectors
 
-
 class SentenceTransformerEncoder:
     def __init__(self, config, *, device="cpu", batch_size=32, offline=True):
         self.config = config

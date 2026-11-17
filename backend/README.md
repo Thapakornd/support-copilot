@@ -1,5 +1,50 @@
 # Support Copilot backend
 
+## Runtime configuration and API startup
+
+Install Python 3.14+ and uv. Copy `.env.example` to `.env` in this directory
+if it does not already exist, then edit the values before starting services.
+All Python commands load this backend `.env` by absolute path, including when
+launched from another working directory. Process environment variables override
+the file. Credentials are never required as command-line arguments.
+
+- `DATABASE_URL` is the shared PostgreSQL connection for document imports and,
+  by default, the embedding worker. The API exposes this setting for persistence;
+  its current health/chat endpoints do not query the database.
+- `EMBEDDING_DATABASE_URL` is an optional worker override for a different runtime
+  role or database host. Omit it to share `DATABASE_URL`.
+- Set `DATABASE_URL` to your separately provisioned database in production.
+  URL-encode special characters in URL credentials. The backend connects to the
+  database; it does not create or start a database server.
+- `API_HOST`, `API_PORT`, and `API_RELOAD` control the API launcher.
+- `CORS_ORIGINS` is a JSON array of allowed frontend origins.
+- `LLM_PROVIDER`, `LLM_MODEL`, and `ANTHROPIC_API_KEY` configure the existing LLM
+  adapter. The key from `.env` is passed directly to the provider; no PowerShell
+  environment export is needed. Leave model/key empty until ready to use chat.
+
+For local development only, optionally start the separate Compose database from
+the project root:
+
+```powershell
+docker compose up -d postgres
+```
+
+Compose has its own local database configuration in `docker-compose.yaml` and
+does not consume `backend/.env`. The example `DATABASE_URL` connects to this local
+database; replace it with your external database connection string when deploying.
+Schema migrations remain manual; see [SQL setup](sql/README.md).
+
+From `backend/`, start the API:
+
+```powershell
+uv sync
+uv run support-copilot
+```
+
+With the example port, health is at `http://127.0.0.1:8000/health` and interactive
+API documentation at `http://127.0.0.1:8000/docs`. Health/docs work without an LLM
+or database. `/chat` requires LLM configuration and does not use retrieval yet.
+
 ## Incremental embedding worker
 
 See [embedding worker setup and operations](docs/embedding-worker.md) for schema
@@ -131,17 +176,17 @@ The default input is `data/knowledge/output/documents.jsonl`; override it using
 and upserts by `document_id` in one transaction. All document fields are retained
 inside `data`. Repeating the same import updates existing documents without
 duplicates. Documents absent from the input remain in the table. Existing chunks
-and embeddings are left unchanged. The command requires Docker Compose and uses
-the local service/database/user named in this project's `docker-compose.yaml`.
+and embeddings are left unchanged. The importer connects directly using `DATABASE_URL` from `backend/.env` or the
+process environment. Docker is only needed if you choose the local Compose database.
 
 Verify from the project root:
 
 ```powershell
-docker compose exec -T postgres psql -U support_copilot -d support_copilot -c "SELECT COUNT(*) FROM public.knowledge_documents;"
+docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT COUNT(*) FROM public.knowledge_documents;"'
 ```
 
 Expect 16 rows for a fresh table with the current dataset. Exit status is 0 for
-success, 1 for Docker/database failure, and 2 for invalid or unreadable input.
+success, 1 for database failure, and 2 for invalid configuration or unreadable input.
 
 1. Check that `report.json` has `failed: 0`, and inspect a sample of documents/chunks.
 2. Load `documents.jsonl`, upserting by `document_id` (stable for a source URL).

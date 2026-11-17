@@ -43,7 +43,7 @@ def test_documented_runtime_role_can_admit_without_model_identity_write(db, conf
             )
             conn.execute(
                 sql.SQL(
-                    "GRANT SELECT,INSERT ON knowledge_document_revisions,knowledge_chunks,chunk_embeddings TO {}"
+                    "GRANT SELECT,INSERT ON knowledge_document_revisions,knowledge_revision_chunks,chunk_embeddings TO {}"
                 ).format(sql.Identifier(role))
             )
             conn.execute(

@@ -1,11 +1,10 @@
-import csv
-import io
 import json
 from unittest.mock import patch
 
+import psycopg
 import pytest
 
-from support_copilot.knowledge.import_documents import build_sql, load_documents, main
+from support_copilot.knowledge.import_documents import load_documents, main
 
 
 def document(**changes):
@@ -24,16 +23,10 @@ def write_file(tmp_path, rows):
     return path
 
 
-def test_copy_serialization_roundtrips_markdown_and_unicode(tmp_path):
+def test_preserves_markdown_and_unicode(tmp_path):
     rows = [document()]
     loaded = load_documents(write_file(tmp_path, rows))
-    sql = build_sql(loaded)
-    copy_data = sql.split("FROM STDIN WITH (FORMAT csv);\n", 1)[1].split("\\.\n", 1)[0]
-    assert [json.loads(row[0]) for row in csv.reader(io.StringIO(copy_data))] == rows
-    assert "ON CONFLICT (document_id) DO UPDATE" in sql
-    assert sql.startswith("BEGIN;")
-    assert sql.rstrip().endswith("COMMIT;")
-    assert "knowledge_chunks" not in sql
+    assert loaded == rows
 
 
 @pytest.mark.parametrize(
@@ -48,14 +41,14 @@ def test_copy_serialization_roundtrips_markdown_and_unicode(tmp_path):
 )
 def test_rejects_invalid_documents_before_database_access(tmp_path, rows):
     path = write_file(tmp_path, rows)
-    with patch("subprocess.run") as run:
+    with patch("psycopg.connect") as run:
         assert main(["--file", str(path)]) == 2
     run.assert_not_called()
 
 
-def test_dry_run_validates_without_docker(tmp_path, capsys):
+def test_dry_run_validates_without_database(tmp_path, capsys):
     path = write_file(tmp_path, [document()])
-    with patch("subprocess.run") as run:
+    with patch("psycopg.connect") as run:
         assert main(["--file", str(path), "--dry-run"]) == 0
     run.assert_not_called()
     assert "1 documents" in capsys.readouterr().out
@@ -80,16 +73,35 @@ def test_malformed_json_has_line_number(tmp_path):
 )
 def test_rejects_strings_postgres_jsonb_cannot_store(tmp_path, metadata):
     path = write_file(tmp_path, [document(metadata=metadata)])
-    with patch("subprocess.run") as run:
+    with patch("psycopg.connect") as run:
         assert main(["--file", str(path), "--dry-run"]) == 2
     run.assert_not_called()
 
 
-def test_database_failure_is_not_reported_as_success(tmp_path, capsys):
+def test_database_failure_is_not_reported_as_success(tmp_path, capsys, monkeypatch):
     path = write_file(tmp_path, [document()])
-    with patch("subprocess.run") as run:
-        run.return_value.returncode = 1
+    monkeypatch.setenv("DATABASE_URL", "postgresql://app:private-password@db/app")
+    with patch(
+        "psycopg.connect", side_effect=psycopg.OperationalError("private-password")
+    ) as connect:
         assert main(["--file", str(path)]) == 1
-        assert run.call_args.kwargs["encoding"] == "utf-8"
-        assert "ON_ERROR_STOP=1" in run.call_args.args[0]
-    assert "Imported" not in capsys.readouterr().out
+        assert connect.call_args.args[0] == "postgresql://app:private-password@db/app"
+    captured = capsys.readouterr()
+    assert "Imported" not in captured.out
+    assert "private-password" not in captured.err
+
+
+def test_missing_database_configuration_is_safe(tmp_path, capsys, monkeypatch):
+    from support_copilot.core.config import Settings
+
+    path = write_file(tmp_path, [document()])
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(
+        "support_copilot.knowledge.import_documents.Settings",
+        lambda: Settings(_env_file=None),
+        raising=False,
+    )
+    with patch("psycopg.connect") as connect:
+        assert main(["--file", str(path)]) == 2
+    connect.assert_not_called()
+    assert "DATABASE_URL" in capsys.readouterr().err

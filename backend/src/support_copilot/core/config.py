@@ -1,16 +1,30 @@
+from pathlib import Path
 from uuid import UUID
 
-from pydantic import Field, SecretStr, model_validator
+from psycopg import ProgrammingError
+from psycopg.conninfo import make_conninfo
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from support_copilot.domain.embedding_job import EmbeddingConfig
 
+BACKEND_DIR = Path(__file__).resolve().parents[3]
+ENV_FILE = BACKEND_DIR / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore"
+    )
 
-    llm_model: str = "claude-sonnet-5-5"
-    anthropic_api_key: str = ""
+    database_url: SecretStr = SecretStr("")
+    llm_model: str = ""
+    llm_provider: str = "anthropic"
+    anthropic_api_key: SecretStr = SecretStr("")
+    api_host: str = "127.0.0.1"
+    api_port: int = Field(default=8000, ge=1, le=65535)
+    api_reload: bool = False
+    cors_origins: list[str] = []
 
 
 settings = Settings()
@@ -18,10 +32,16 @@ settings = Settings()
 
 class WorkerSettings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", extra="ignore", env_prefix="EMBEDDING_"
+        env_file=ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+        env_prefix="EMBEDDING_",
+        populate_by_name=True,
     )
 
-    database_url: SecretStr
+    database_url: SecretStr = Field(
+        validation_alias=AliasChoices("EMBEDDING_DATABASE_URL", "DATABASE_URL")
+    )
     model_id: UUID
     model_name: str = Field(min_length=1)
     model_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
@@ -45,6 +65,10 @@ class WorkerSettings(BaseSettings):
             raise ValueError("Heartbeat must be shorter than lease")
         if not self.database_url.get_secret_value().strip():
             raise ValueError("Database URL is required")
+        try:
+            make_conninfo(self.database_url.get_secret_value())
+        except ProgrammingError:
+            raise ValueError("Invalid PostgreSQL connection configuration") from None
         return self
 
     def effective_config(self) -> EmbeddingConfig:
