@@ -4,7 +4,7 @@ import { CaseSidebar } from '../features/cases/CaseSidebar'
 import { CommentThread } from '../features/cases/CommentThread'
 import { ReplyForm } from '../features/cases/ReplyForm'
 import { isOpen, pillClass } from '../features/cases/status'
-import { useTicketMutation } from '../features/cases/useTicketMutation'
+import { failureText, useTicketMutation } from '../features/cases/useTicketMutation'
 import { q } from '../shared/api/queries'
 import { takeTicket, updateTicket, type Status } from '../shared/api/tickets'
 import { fmt } from '../shared/lib/format'
@@ -19,8 +19,12 @@ export function CaseDetailPage() {
   const take = useTicketMutation(takeTicket)
   const setStatus = useTicketMutation((status: Status) => updateTicket(caseId, { status }))
   const agent = me.role === 'agent'
+  const failure = take.error ?? setStatus.error
 
   if (!t) return <NotFound title={`Case ${caseId} not found`} back="/cases" backLabel="Back to cases" />
+
+  // the rest of the account can read the case; the API lets only its reporter act on it
+  const canWrite = agent || t.reporter === me.name
 
   return (
     <section className="page wide">
@@ -35,15 +39,17 @@ export function CaseDetailPage() {
           </p>
         </div>
         {agent && !t.assignee && isOpen(t) && <button className="btn pri" onClick={() => take.mutate(t.id)}>Take case</button>}
-        {!agent && (isOpen(t)
+        {!agent && canWrite && (isOpen(t)
           ? <button className="btn" onClick={() => setStatus.mutate('Resolved')}>Mark as resolved</button>
           : <button className="btn" onClick={() => setStatus.mutate('Submitted')}>Reopen case</button>)}
       </div>
 
+      {failure && <p className="meta" role="alert">{failureText(failure)}</p>}
+
       <div className="case-grid">
         <div className="col">
           <CommentThread ticket={t} />
-          {(isOpen(t) || !agent) && <ReplyForm ticket={t} agent={agent} />}
+          {canWrite && (isOpen(t) || !agent) && <ReplyForm ticket={t} agent={agent} />}
         </div>
         <CaseSidebar ticket={t} agent={agent} />
       </div>

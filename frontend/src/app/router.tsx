@@ -9,12 +9,21 @@ import { HelpPage } from '../pages/HelpPage'
 import { KnowledgeBasePage } from '../pages/KnowledgeBasePage'
 import { NewCasePage } from '../pages/NewCasePage'
 import { QueuePage } from '../pages/QueuePage'
+import { ApiError } from '../shared/api/client'
 import { q } from '../shared/api/queries'
 import { NotFound } from '../shared/ui/NotFound'
 import { Footer } from '../widgets/Footer'
 import { Header } from '../widgets/Header/Header'
 
-export const queryClient = new QueryClient()
+export const queryClient = new QueryClient({
+  // a 4xx will not get better by asking again
+  defaultOptions: { queries: { retry: (n, e) => n < 3 && !(e instanceof ApiError && e.status < 500) } },
+})
+
+const errorTitle = (error: unknown) =>
+  error instanceof ApiError && error.status === 401
+    ? 'The API did not accept the demo sign-in. Set DEMO_AUTH=true and load backend/sql/demo_identities.sql.'
+    : `Something went wrong: ${error instanceof Error ? error.message : String(error)}`
 
 const root = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   // the signed-in user gates every page, so load it before anything renders
@@ -27,7 +36,7 @@ const root = createRootRouteWithContext<{ queryClient: QueryClient }>()({
     </>
   ),
   notFoundComponent: () => <NotFound title="Page not found" />,
-  errorComponent: ({ error }) => <NotFound title={`Something went wrong: ${error instanceof Error ? error.message : String(error)}`} />,
+  errorComponent: ({ error }) => <NotFound title={errorTitle(error)} />,
 })
 
 const route = <P extends string>(path: P) => ({ getParentRoute: () => root, path })
@@ -49,7 +58,6 @@ const agentOnly = async ({ context }: { context: { queryClient: QueryClient } })
 const help = createRoute({ ...route('/help'), component: HelpPage })
 const ask = createRoute({
   ...route('/help/$category'),
-  loader: ({ context }) => context.queryClient.ensureQueryData(q.articles),
   component: AskPage,
   remountDeps: ({ params }) => params.category,
 })
@@ -80,10 +88,13 @@ const cases = createRoute({
 })
 const caseDetail = createRoute({
   ...route('/cases/$caseId'),
-  loader: ({ context, params }) => Promise.all([
-    context.queryClient.ensureQueryData(q.ticket(params.caseId)),
-    context.queryClient.ensureQueryData(q.agents),
-  ]),
+  loader: async ({ context, params }) => {
+    const me = await context.queryClient.ensureQueryData(q.me)
+    await Promise.all([
+      context.queryClient.ensureQueryData(q.ticket(params.caseId)),
+      me.role === 'agent' && context.queryClient.ensureQueryData(q.agents), // agent-only endpoint
+    ])
+  },
   component: CaseDetailPage,
   remountDeps: ({ params }) => params.caseId,
 })

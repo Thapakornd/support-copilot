@@ -18,7 +18,7 @@ export function TeamTable() {
           ))}
         </tbody>
       </table>
-      <p className="empty meta">Demo team. Inviting people needs real sign-in, which this prototype does not have yet.</p>
+      <p className="empty meta">Inviting people needs real sign-in, which this prototype does not have yet.</p>
     </div>
   )
 }

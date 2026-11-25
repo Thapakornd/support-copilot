@@ -1,11 +1,15 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { q } from '../shared/api/queries'
 import { catName } from '../shared/config/categories'
+import { fmtDate } from '../shared/lib/format'
 import { Icon } from '../shared/ui/Icon'
 import { ICONS } from '../shared/ui/icons'
 import { NotFound } from '../shared/ui/NotFound'
+
+// the markdown renderer is only needed here
+const ArticleContent = lazy(() => import('../features/knowledge-base/ArticleContent').then((m) => ({ default: m.ArticleContent })))
 
 const route = getRouteApi('/kb/$articleId')
 
@@ -26,7 +30,7 @@ export function ArticlePage() {
       </nav>
       <div className="case-grid">
         <article className="col">
-          <p className="meta">Last update {a.updated} | <b>{a.type}</b> · {a.product}</p>
+          <p className="meta">Last update {fmtDate(a.updated)} | <b>{a.type}</b> · {a.product}</p>
           <h1 className="display sm">{a.title}</h1>
           <section className="card pad">
             <h2 className="sec">Summary</h2>
@@ -39,6 +43,7 @@ export function ArticlePage() {
               {a.body.note && <p className="note"><b>Note:</b> {a.body.note}</p>}
             </section>
           )}
+          <Suspense fallback={<p className="meta">Loading article…</p>}><ArticleContent content={a.content} sourceUrl={a.sourceUrl} /></Suspense>
           <div className="card pad vote-row">
             <span>Was this article helpful?</span>
             <button className="btn sm" aria-pressed={vote === 'up'} onClick={() => setVote('up')}>Yes</button>
@@ -54,7 +59,7 @@ export function ArticlePage() {
               <dt>Type</dt><dd>{a.type}</dd>
               <dt>Product</dt><dd>{a.product}</dd>
               <dt>Topic</dt><dd>{catName(a.topic)}</dd>
-              <dt>Updated</dt><dd>{a.updated}</dd>
+              <dt>Updated</dt><dd>{fmtDate(a.updated)}</dd>
             </dl>
           </section>
           <h2 className="h3">Related articles</h2>

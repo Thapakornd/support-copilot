@@ -1,5 +1,5 @@
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { q } from '../../shared/api/queries'
 import { switchDemoRole, type Role } from '../../shared/api/users'
 import { Icon } from '../../shared/ui/Icon'
@@ -13,15 +13,14 @@ const TABS = {
 
 export function Header() {
   const { data: me } = useSuspenseQuery(q.me)
-  const qc = useQueryClient()
-  const navigate = useNavigate()
   const agent = me.role === 'agent'
 
   // ponytail: demo role switch stands in for login; delete with real auth.
-  async function switchRole(r: Role) {
-    await switchDemoRole(r)
-    await qc.invalidateQueries()
-    navigate({ to: '/' })
+  // A full reload drops everything cached for the previous user.
+  function switchRole(r: Role) {
+    switchDemoRole(r)
+    location.hash = '#/'
+    location.reload()
   }
 
   return (

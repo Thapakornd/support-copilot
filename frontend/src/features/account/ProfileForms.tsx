@@ -23,8 +23,8 @@ function useProfileEditor() {
   return { p, edit, submit, save }
 }
 
-function Actions({ saved, pending, children }: { saved: boolean; pending: boolean; children: ReactNode }) {
-  return <div className="actions gap">{saved && <span className="meta">Saved.</span>}<button className="btn pri" disabled={pending}>{children}</button></div>
+function Actions({ saved, failed, pending, children }: { saved: boolean; failed: boolean; pending: boolean; children: ReactNode }) {
+  return <div className="actions gap">{failed && <span className="meta" role="alert">Could not save. Check the fields and try again.</span>}{saved && <span className="meta">Saved.</span>}<button className="btn pri" disabled={pending}>{children}</button></div>
 }
 
 export function ProfileForm() {
@@ -38,11 +38,11 @@ export function ProfileForm() {
         <label className="lbl">Phone (for critical cases)<input className="fld" type="tel" value={p.phone} onChange={(e) => edit({ phone: e.target.value })} placeholder="Optional" /></label>
         <label className="lbl">Time zone
           <select className="fld" value={p.timezone} onChange={(e) => edit({ timezone: e.target.value })}>
-            {ZONES.map((z) => <option key={z}>{z}</option>)}
+            {[...new Set([...ZONES, p.timezone])].map((z) => <option key={z}>{z}</option>)}
           </select>
         </label>
       </div>
-      <Actions saved={save.isSuccess} pending={save.isPending}>Save changes</Actions>
+      <Actions saved={save.isSuccess} failed={save.isError} pending={save.isPending}>Save changes</Actions>
     </form>
   )
 }
@@ -62,7 +62,7 @@ export function NotificationsForm({ role }: { role: Role }) {
           <input type="checkbox" checked={p.notify[k]} onChange={(e) => edit({ notify: { ...p.notify, [k]: e.target.checked } })} />{label}
         </label>
       ))}
-      <Actions saved={save.isSuccess} pending={save.isPending}>Save preferences</Actions>
+      <Actions saved={save.isSuccess} failed={save.isError} pending={save.isPending}>Save preferences</Actions>
     </form>
   )
 }

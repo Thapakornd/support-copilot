@@ -40,7 +40,7 @@ export function CasesPage() {
       <div className="page-head">
         <div>
           <h1 className="display sm">{agent ? 'All cases' : 'Cases'}</h1>
-          <p className="meta">{agent ? 'Every case across customers.' : 'Every support case opened from this account.'} Demo data, stored in this browser.</p>
+          <p className="meta">{agent ? 'Every case across customers.' : 'Every support case opened from this account.'}</p>
         </div>
         {!agent && <Link className="btn pri" to="/case">Create a case</Link>}
       </div>

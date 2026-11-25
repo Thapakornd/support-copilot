@@ -2,7 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { isOpen, sevRank } from '../features/cases/status'
-import { useTicketMutation } from '../features/cases/useTicketMutation'
+import { failureText, useTicketMutation } from '../features/cases/useTicketMutation'
 import { q } from '../shared/api/queries'
 import { takeTicket } from '../shared/api/tickets'
 import { StatRow } from '../shared/ui/StatRow'
@@ -45,6 +45,7 @@ export function QueuePage() {
           <button key={v} className="tabpill" aria-pressed={view === v} onClick={() => setView(v)}>{label} <span className="count">{views[v].length}</span></button>
         ))}
       </div>
+      {take.isError && <p className="meta" role="alert">{failureText(take.error)}</p>}
       <CaseTable
         tickets={list}
         mode="queue"

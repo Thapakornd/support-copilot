@@ -6,10 +6,10 @@ import type { CaseDraft } from './draft'
 
 export function CaseForm({ draft, onCreated }: { draft?: CaseDraft; onCreated: (t: Ticket) => void }) {
   const qc = useQueryClient()
-  const [title, setTitle] = useState(draft?.question ?? '')
+  const [title, setTitle] = useState(draft?.question.slice(0, 2000) ?? '')
   const [category, setCategory] = useState(draft?.category ?? '')
   const [sev, setSev] = useState<Severity>('Normal')
-  const [desc, setDesc] = useState(draft ? `${draft.question}\n\nWhat I tried from the AI suggestion, and what happened:\n` : '')
+  const [desc, setDesc] = useState(draft?.answer ? `${draft.question}\n\nWhat I tried from the AI suggestion, and what happened:\n` : draft?.question ?? '')
   const [ok, setOk] = useState(false)
 
   const create = useMutation({
@@ -22,12 +22,12 @@ export function CaseForm({ draft, onCreated }: { draft?: CaseDraft; onCreated: (
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    create.mutate({ title, category, severity: sev, description: desc, sources: draft?.sources ?? [], aiAnswer: draft?.answer })
+    create.mutate({ title, category, severity: sev, description: desc, sources: draft?.sources ?? [], aiAnswer: draft?.answer, consent: ok })
   }
 
   return (
     <form className="form card" onSubmit={submit}>
-      <label className="lbl">Title<input className="fld" required value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+      <label className="lbl">Title<input className="fld" required maxLength={2000} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
       <label className="lbl">Area
         <select className="fld" required value={category} onChange={(e) => setCategory(e.target.value)}>
           <option value="">Choose an area…</option>
@@ -40,9 +40,9 @@ export function CaseForm({ draft, onCreated }: { draft?: CaseDraft; onCreated: (
           <label key={s} className="sevo"><input type="radio" name="sev" checked={sev === s} onChange={() => setSev(s)} /><b>{s}</b></label>
         ))}
       </fieldset>
-      <label className="lbl">Description<textarea className="fld" rows={8} required value={desc} onChange={(e) => setDesc(e.target.value)} /></label>
+      <label className="lbl">Description<textarea className="fld" rows={8} required maxLength={20000} value={desc} onChange={(e) => setDesc(e.target.value)} /></label>
       {!!draft?.sources.length && (
-        <div><p className="sec">Articles already consulted</p><ul>{draft.sources.map((s) => <li key={s.title}>{s.title}</li>)}</ul></div>
+        <div><p className="sec">Articles already consulted</p><ul>{draft.sources.map((s, i) => <li key={i}>{s.title}</li>)}</ul></div>
       )}
       <label className="check"><input type="checkbox" required checked={ok} onChange={(e) => setOk(e.target.checked)} />I understand the text I supplied may be shared with the support team.</label>
       {create.isError && <p className="meta" role="alert">Could not submit the case. Try again.</p>}

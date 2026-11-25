@@ -1,4 +1,4 @@
-import { TEAM, demoProfile, saveDemoProfile } from './demo/users'
+import { api } from './client'
 
 export type Profile = {
   name: string
@@ -8,9 +8,8 @@ export type Profile = {
   phone: string
   notify: { replies: boolean; status: boolean; digest: boolean }
 }
-export type TeamMember = (typeof TEAM)[number]
+export type TeamMember = { name: string; email: string; role: string; cases: boolean }
 
-// ponytail: demo stand-ins; become GET/PUT /profile and GET /team.
-export const getProfile = async (): Promise<Profile> => demoProfile()
-export const saveProfile = async (p: Profile): Promise<Profile> => { saveDemoProfile(p); return p }
-export const listTeam = async (): Promise<TeamMember[]> => TEAM
+export const getProfile = () => api<Profile>('/profile')
+export const saveProfile = (p: Profile) => api<Profile>('/profile', { method: 'PUT', body: JSON.stringify(p) })
+export const listTeam = () => api<TeamMember[]>('/team')

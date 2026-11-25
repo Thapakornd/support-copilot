@@ -1,4 +1,4 @@
-import { ARTICLES, BODIES } from './demo/articles'
+import { api, orNull } from './client'
 
 export type Article = {
   id: string
@@ -6,24 +6,20 @@ export type Article = {
   type: 'Knowledge Article' | 'Documentation' | 'Community Forum' | 'Video'
   product: 'Atlas' | 'Server' | 'Drivers' | 'Ops Manager'
   topic: string // category id
-  updated: string
+  updated: string // ISO
   excerpt: string
 }
 export type ArticleBody = { steps: string[]; note?: string }
-export type ArticleDetail = Article & { body?: ArticleBody }
+export type ArticleDetail = Article & { content: string; sourceUrl: string; body?: ArticleBody }
 
-// ponytail: async over static data so pages already treat this as a network call; swap bodies for api() later.
-export const listArticles = async (): Promise<Article[]> => ARTICLES
+/** Newest first. */
+export const listArticles = () => api<Article[]>('/articles')
 
-export const getArticle = async (id: string): Promise<ArticleDetail | null> => {
-  const a = ARTICLES.find((x) => x.id === id)
-  return a ? { ...a, body: BODIES[a.id] } : null
+export async function getArticle(id: string): Promise<ArticleDetail | null> {
+  if (id === 'search') return null // /articles/search is the search endpoint, never an article
+  return orNull(api<ArticleDetail>(`/articles/${encodeURIComponent(id)}`))
 }
 
-/** Category narrows the corpus first; the question only ranks within it. */
-export async function searchArticles(q: string, topic?: string): Promise<Article[]> {
-  const words = q.toLowerCase().split(/\W+/).filter((w) => w.length > 2)
-  const pool = topic ? ARTICLES.filter((a) => a.topic === topic) : ARTICLES
-  const score = (a: Article) => words.filter((w) => (a.title + ' ' + a.excerpt).toLowerCase().includes(w)).length
-  return [...pool].sort((a, b) => score(b) - score(a))
-}
+/** Matching articles only, best first. The API accepts at most 4000 characters. */
+export const searchArticles = (q: string, topic?: string) =>
+  api<Article[]>(`/articles/search?${new URLSearchParams({ q: q.slice(0, 4000), ...(topic && { topic }) })}`)

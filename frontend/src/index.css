@@ -196,6 +196,18 @@ td.mono, td.meta { white-space: nowrap }
 .note { background: var(--amber-bg); color: var(--amber); border-radius: 10px; padding: 10px 12px; font-size: 13px }
 .pad.vote-row { flex-direction: row; flex-wrap: wrap; align-items: center }
 .vote-row .btn[aria-pressed="true"] { border-color: var(--green); background: var(--green-bg) }
+.md { min-width: 0; line-height: 1.65; overflow-wrap: break-word }
+.md > * + * { margin-top: 12px }
+.md h2 { font-size: 20px; margin-top: 28px } .md h3 { font-size: 17px; margin-top: 22px } .md h4, .md h5, .md h6 { font-size: 15px; margin-top: 18px }
+.md ul, .md ol { margin-bottom: 0; padding-left: 22px }
+.md li > * + * { margin-top: 8px }
+.md code { font: 13px/1.5 ui-monospace, Consolas, monospace; background: var(--soft); border-radius: 4px; padding: 1px 4px }
+.md pre { margin-bottom: 0; padding: 12px 14px; overflow-x: auto; background: var(--soft); border: 1px solid var(--line); border-radius: 8px }
+.md pre code { padding: 0; background: none }
+.md-table { overflow-x: auto }
+.md table { min-width: 0 }
+.md td { vertical-align: top }
+.md img { max-width: 100%; height: auto }
 .related { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px }
 .related a { text-decoration: none; font-weight: 500 }
 .related a:hover { text-decoration: underline }

@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import type { Ticket } from '../../shared/api/tickets'
 import { fmt } from '../../shared/lib/format'
+import { sourceUrl } from '../../shared/lib/sourceUrl'
 import { Icon } from '../../shared/ui/Icon'
 import { ICONS } from '../../shared/ui/icons'
 
@@ -18,7 +19,16 @@ export function CommentThread({ ticket: t }: { ticket: Ticket }) {
           <p className="pre">{t.aiAnswer}</p>
           {!!t.sources.length && (
             <ul className="refs">
-              {t.sources.map((s) => <li key={s.title}>{s.id ? <Link to="/kb/$articleId" params={{ articleId: s.id }}>{s.title}</Link> : s.title}</li>)}
+              {t.sources.map((s, i) => {
+                const url = sourceUrl(s.url)
+                return (
+                  <li key={i}>
+                    {url ? <a href={url} target="_blank" rel="noopener noreferrer">{s.title}</a>
+                      : s.id ? <Link to="/kb/$articleId" params={{ articleId: s.id }}>{s.title}</Link>
+                      : s.title}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </section>
