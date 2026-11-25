@@ -271,6 +271,18 @@ revision, dimension, and distance metric during ingestion. Do not create fake
 model seed rows. Multiple dimensions require separately designed physical tables
 or partitions and matching indexes. No HNSW index is created initially.
 
+## Demo identities (optional)
+
+`demo_identities.sql` seeds the frontend's demo people for `DEMO_AUTH=true`:
+account `Demo Org`; customers `customer`, `mina` and `jordan` (the last cannot open
+cases); agents `alex`, `priya` and `sam`. Send the subject as `X-Demo-User`. It is not
+part of the required sequence, can run after `001_schema.sql` at any time, and is
+rerunnable: existing rows are never overwritten, so profile edits survive.
+
+```powershell
+Get-Content -Raw backend/sql/demo_identities.sql | docker compose exec -T postgres sh -c 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
 ## Do we need seed data?
 
 Yes for the eight category reference rows: foreign keys and frontend category IDs

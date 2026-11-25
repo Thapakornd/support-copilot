@@ -2,13 +2,14 @@ from dataclasses import replace
 from threading import Event
 
 import psycopg
+from test_embedding_admission import stage
+
 from support_copilot.domain.embedding_job import ProcessingError
 from support_copilot.infrastructure.embeddings.chunker import TokenAwareChunker
 from support_copilot.infrastructure.postgres.knowledge_repository import (
     KnowledgeRepository,
 )
 from support_copilot.interface.worker.main import run_once
-from test_embedding_admission import stage
 
 
 class Encoder:

@@ -1,10 +1,11 @@
 import psycopg
 import pytest
+from test_embedding_admission import stage
+
 from support_copilot.domain.embedding_job import OwnershipLost, ProcessingError
 from support_copilot.infrastructure.postgres.knowledge_repository import (
     KnowledgeRepository,
 )
-from test_embedding_admission import stage
 
 
 def chunks(text="First"):

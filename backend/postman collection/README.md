@@ -11,9 +11,18 @@
 
 The collection covers `GET /health` and `POST /chat`, including chat examples
 with and without the optional `category`. Edit the JSON request body to change
-the question or category. No API authentication is currently required.
+the question or category. Chat needs no authentication.
 
-Health works without an LLM or database. Chat requires `LLM_PROVIDER`,
-`LLM_MODEL`, and `ANTHROPIC_API_KEY` in `backend/.env`. Keep provider credentials
-on the backend; they do not belong in Postman. Chat calls the provider and does
-not use retrieval yet. Running the entire collection sends two LLM requests.
+The frontend endpoints (`/me`, `/agents`, `/profile`, `/team`, `/articles`, `/tickets`) use the
+demo identity header: set `DEMO_AUTH=true` (loopback `API_HOST` only), apply
+`backend/sql/demo_identities.sql`, and set the `demo_user` variable to `customer`,
+`mina`, `jordan`, `alex`, `priya` or `sam`. Without it they return 401.
+The **Tickets** requests use the `ticket_id` variable (`SC-<number>`): send
+**Tickets - create** as `customer`, copy the returned `id` into `ticket_id`, then
+switch `demo_user` to `alex` to take, reply to or patch it.
+
+Health works without an LLM or database. For chat, install and run with
+`--extra embeddings` and configure the API database, pinned embedding model and
+generation provider as described in the [backend setup guide](../README.md).
+Chat searches published knowledge and calls the provider when it finds usable
+evidence. The response includes `answer`, `status` and the ordered `sources`.

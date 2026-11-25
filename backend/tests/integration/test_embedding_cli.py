@@ -4,10 +4,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from test_embedding_admission import stage
+
 from support_copilot.infrastructure.postgres.knowledge_repository import (
     KnowledgeRepository,
 )
-from test_embedding_admission import stage
 
 
 def command(db, config, module, *args, **changes):

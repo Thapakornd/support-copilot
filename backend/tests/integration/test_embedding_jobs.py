@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import psycopg
 import pytest
+
 from support_copilot.domain.embedding_job import EmbeddingConfig, OwnershipLost
 from support_copilot.infrastructure.postgres.embedding_jobs import (
     PostgresEmbeddingStore,

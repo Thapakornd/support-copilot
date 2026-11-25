@@ -3,7 +3,7 @@
 The importer writes mutable staging JSON only. Admission snapshots selected documents
 and creates durable jobs. `--once` processes admitted work eligible at its initial
 database-time cutoff, then exits. A complete previous publication stays available
-until its replacement commits. Chat retrieval is unchanged by this feature.
+until its replacement commits. [RAG chat](rag-chat.md) searches these publications.
 
 ## Installation and schema prerequisites
 
@@ -80,7 +80,7 @@ Prompt strings are required even when empty. They override model default prompts
 explicitly, so the prefix is applied once. Token counting includes the prompt and
 special tokens, and uses the actual model tokenizer without truncation. The
 configured limit must not exceed the model's supported limit. Query encoding
-shares the same adapter but is not wired into the chat endpoint yet.
+uses the same adapter when a chat request searches published passages.
 
 Defaults: lease 300 seconds, heartbeat 60 seconds, maximum attempts 3, inference
 batch size 32, document budget 100000 tokens / 2000 chunks, character target 2400.

@@ -11,6 +11,7 @@ from time import monotonic
 
 import psycopg
 from pydantic import ValidationError
+
 from support_copilot.application.use_cases.process_embedding_job import process_job
 from support_copilot.domain.embedding_job import OwnershipLost, ProcessingError
 from support_copilot.interface.worker.heartbeat import Heartbeat

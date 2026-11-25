@@ -4,10 +4,11 @@ import psycopg
 import pytest
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
+from test_embedding_admission import stage
+
 from support_copilot.infrastructure.postgres.knowledge_repository import (
     KnowledgeRepository,
 )
-from test_embedding_admission import stage
 
 
 def test_documented_runtime_role_can_admit_without_model_identity_write(db, config):

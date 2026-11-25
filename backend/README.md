@@ -1,26 +1,75 @@
 # Support Copilot backend
 
-## Runtime configuration and API startup
+## Environment variables
 
-Install Python 3.14+ and uv. Copy `.env.example` to `.env` in this directory
-if it does not already exist, then edit the values before starting services.
-All Python commands load this backend `.env` by absolute path, including when
-launched from another working directory. Process environment variables override
-the file. Credentials are never required as command-line arguments.
+Install Python 3.14+ and uv. If `backend/.env` is missing, copy
+[`.env.example`](.env.example) to `backend/.env`. Uncomment the settings you need
+and replace the placeholders. Backend commands load this file from its absolute
+path. Process environment variables take precedence over values in the file.
 
-- `DATABASE_URL` is the shared PostgreSQL connection for document imports and,
-  by default, the embedding worker. The API exposes this setting for persistence;
-  its current health/chat endpoints do not query the database.
-- `EMBEDDING_DATABASE_URL` is an optional worker override for a different runtime
-  role or database host. Omit it to share `DATABASE_URL`.
-- Set `DATABASE_URL` to your separately provisioned database in production.
-  URL-encode special characters in URL credentials. The backend connects to the
-  database; it does not create or start a database server.
-- `API_HOST`, `API_PORT`, and `API_RELOAD` control the API launcher.
-- `CORS_ORIGINS` is a JSON array of allowed frontend origins.
-- `LLM_PROVIDER`, `LLM_MODEL`, and `ANTHROPIC_API_KEY` configure the existing LLM
-  adapter. The key from `.env` is passed directly to the provider; no PowerShell
-  environment export is needed. Leave model/key empty until ready to use chat.
+### Minimum configuration by command
+
+| What you want to run | What to set |
+| --- | --- |
+| `support-copilot` for `/health` and `/docs` | No required variables. Keep the template's `CORS_ORIGINS` for the local Vite frontend. |
+| `support-copilot` for `/chat` | `DATABASE_URL`, the [embedding model settings](#required-embedding-model-settings) used to publish the corpus, `LLM_MODEL`, and the key for the selected provider. Install the embeddings extra. |
+| `support-copilot-prepare-knowledge` or `support-copilot-import-documents --dry-run` | No required variables. |
+| `support-copilot-import-documents` | `DATABASE_URL`. |
+| `support-copilot-enqueue-embeddings` and `support-copilot-worker` | One PostgreSQL connection (`DATABASE_URL` or `EMBEDDING_DATABASE_URL`) and the seven [required embedding model settings](#required-embedding-model-settings). |
+
+### Database, API, and chat settings
+
+| Variable | Required or default | What to set |
+| --- | --- | --- |
+| `DATABASE_URL` | Required for imports and shared by the embedding commands by default. | PostgreSQL connection URI. The template points to the local Compose database. Use the URI for your own database when deploying. Percent-encode special characters in URI credentials. |
+| `EMBEDDING_DATABASE_URL` | Optional override. Falls back to `DATABASE_URL` for enqueue and worker commands. | Set a PostgreSQL URI here if embeddings use a different runtime role or connection endpoint. The importer still uses `DATABASE_URL`. Use the same database for both when embedding imported documents. |
+| `API_HOST` | Optional, `127.0.0.1`. | Address the API binds to. Use `127.0.0.1` for local development or `0.0.0.0` when the API needs to listen on all IPv4 interfaces. |
+| `API_PORT` | Optional, `8000`. | API listening port from `1` to `65535`. The frontend API URL must use this port. |
+| `API_RELOAD` | Optional, `false`. The local template sets `true`. | Use `true` to restart the API when code changes during development. |
+| `CORS_ORIGINS` | Optional, `[]`. The local template allows `http://localhost:5173`. | JSON array of browser frontend origins, including scheme and port if applicable. For example, `["http://localhost:5173"]`. Use the exact hostname the browser opens. |
+| `DEMO_AUTH` | Optional, `false`. | Set `true` to let the `X-Demo-User: <subject>` header sign requests in as a user with `auth_issuer='demo'` (frontend endpoints only; `/chat` and `/health` are unaffected). The header is impersonation by design, so settings reject `true` unless `API_HOST` is `127.0.0.1`, `localhost` or `::1`. With `false`, every frontend endpoint returns 401. Seed the demo people with `backend/sql/demo_identities.sql`. |
+| `LLM_PROVIDER` | Optional, `anthropic`. | Use `anthropic` for direct Anthropic access or `openrouter` for OpenRouter. |
+| `LLM_MODEL` | Required for `/chat`. | Set the exact model ID available to your provider account. |
+| `ANTHROPIC_API_KEY` | Required for Anthropic chat. | Set the API key from your Anthropic account. Keep it in your local `.env` or environment. |
+| `OPENROUTER_API_KEY` | Required for OpenRouter chat. | Set your OpenRouter key in the backend environment or local `.env`. Set `LLM_MODEL` to the full OpenRouter model ID and select a model that supports tool calling for structured answers. |
+
+### Required embedding model settings
+
+Use the same values for enqueue and worker commands. Register the model in
+`public.embedding_models` and apply the schema for its dimensions before running
+either command. The [embedding worker guide](docs/embedding-worker.md) covers the
+registry, permissions, migrations, and first run.
+
+| Variable | What to set |
+| --- | --- |
+| `EMBEDDING_MODEL_ID` | UUID of the active row in `public.embedding_models` for this model and revision. Generate a UUID when registering a new model and reuse it here. |
+| `EMBEDDING_MODEL_NAME` | Exact Hugging Face model identifier recorded in `model_name`, for example `intfloat/e5-small-v2`. |
+| `EMBEDDING_MODEL_REVISION` | Full 40-character lowercase Git commit SHA from the model repository, matching `model_revision` in PostgreSQL. Use the SHA for the files you intend to load. |
+| `EMBEDDING_DIMENSIONS` | Number of floats the model outputs per embedding. Match the model, registry row, and `vector(N)` column created by `002_embeddings.sql`. |
+| `EMBEDDING_TOKENIZER_LIMIT` | Positive maximum input length in tokens, including the prefix and special tokens. Use the model's supported tokenizer limit or a lower value. |
+| `EMBEDDING_DOCUMENT_PROMPT` | Prefix the model expects for document passages. Use `""` if it needs an empty prefix. Preserve any trailing space specified by the model. |
+| `EMBEDDING_QUERY_PROMPT` | Prefix the model expects for search queries. Use `""` if it needs an empty prefix. Keep it identical across chat and publication. |
+
+For example, the [E5-small-v2 model card](https://huggingface.co/intfloat/e5-small-v2)
+specifies `384` dimensions, a `512`-token input limit, and the prefixes
+`"passage: "` and `"query: "`. Use your registered UUID and the commit SHA for the
+revision you selected. Both prompt variables must be explicitly set.
+
+### Optional embedding settings
+
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `EMBEDDING_OFFLINE` | `true` | Load the pinned model from the local cache. Set `false` to allow the first download if the files are missing. |
+| `EMBEDDING_DEVICE` | `cpu` | Device used for model inference. Keep `cpu` for CPU-only development or set a device supported by your installed runtime, such as `cuda` on a compatible setup. |
+| `EMBEDDING_LEASE_SECONDS` | `300` | How long a worker owns a claimed job before another run can recover the expired claim. Set a positive duration longer than the heartbeat interval. |
+| `EMBEDDING_HEARTBEAT_SECONDS` | `60` | How often the worker renews its claim. Set a positive interval shorter than the lease. |
+| `EMBEDDING_MAX_ATTEMPTS` | `3` | Maximum processing attempts recorded when a job is enqueued, including its first attempt. Use a positive integer. |
+| `EMBEDDING_BATCH_SIZE` | `32` | Maximum passages encoded per inference batch. Use a positive integer. Lower it if inference runs out of memory. |
+| `EMBEDDING_MAX_DOCUMENT_TOKENS` | `100000` | Positive token budget for each document and its prepared chunks. Exceeding the budget fails the job. |
+| `EMBEDDING_MAX_DOCUMENT_CHUNKS` | `2000` | Positive maximum number of chunks per document. Exceeding it fails the job. |
+| `EMBEDDING_TARGET_CHARS` | `2400` | Initial target chunk size in characters, with a minimum of `100`. The worker also checks the actual token limit. |
+
+## API startup
 
 For local development only, optionally start the separate Compose database from
 the project root:
@@ -37,13 +86,31 @@ Schema migrations remain manual; see [SQL setup](sql/README.md).
 From `backend/`, start the API:
 
 ```powershell
-uv sync
-uv run support-copilot
+uv sync --extra embeddings
+uv run --extra embeddings support-copilot
 ```
 
 With the example port, health is at `http://127.0.0.1:8000/health` and interactive
 API documentation at `http://127.0.0.1:8000/docs`. Health/docs work without an LLM
-or database. `/chat` requires LLM configuration and does not use retrieval yet.
+or database. For `/chat`, grant the API role schema usage and SELECT on
+`categories`, `embedding_models`, `knowledge_documents`, `knowledge_document_revisions`,
+`knowledge_chunk_sets`, `knowledge_revision_chunks`, `chunk_embeddings`, and
+`retrieval_publications`. Point `DATABASE_URL` at the database with the published
+corpus. Match the publishing worker's model, prompts, tokenizer limit,
+`EMBEDDING_TARGET_CHARS`, `EMBEDDING_MAX_DOCUMENT_TOKENS` and
+`EMBEDDING_MAX_DOCUMENT_CHUNKS`. Retrieval checks the full chunk-set configuration
+hash before ranking candidates. See the [RAG chat workflow](docs/rag-chat.md) for the publication check
+and the request and response contract.
+
+## Chat retrieval settings
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `CHAT_CANDIDATE_LIMIT` | 20 | Maximum nearest passages fetched for one question. |
+| `CHAT_MAX_DISTANCE` | 0.5 | Largest cosine distance accepted. Calibrate this cutoff using questions from your corpus. |
+| `CHAT_MAX_PASSAGES` | 6 | Maximum passages sent to the generation model. |
+| `CHAT_EVIDENCE_CHAR_LIMIT` | 12000 | Evidence character budget. Select a value that fits your generation model alongside the question, instructions and output. |
+| `LLM_TIMEOUT_SECONDS` | 30 | Timeout passed to the generation provider. |
 
 ## Incremental embedding worker
 
@@ -113,6 +180,30 @@ reported for review.
 The broad built-in roles reference was deliberately excluded: its published
 Markdown omitted important role names during review. Atlas database-user guidance
 remains in scope, but this corpus is not a complete role/privilege reference.
+
+### Third-party content and licensing
+
+This is a personal, non-commercial learning project. It is not affiliated with,
+endorsed by or sponsored by MongoDB, Inc. "MongoDB" and "Atlas" are trademarks of
+MongoDB, Inc.
+
+- **No MongoDB text is stored in this repository.** `data/knowledge/sources.json`
+  lists URLs only. The downloaded and prepared documentation (`data/knowledge/output/`)
+  and the database contents are generated on your machine and are gitignored. Do not
+  commit or redistribute them.
+- **The documentation belongs to MongoDB.** The
+  [mongodb/docs repository](https://github.com/mongodb/docs) states that the
+  documentation is under
+  [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/), while the
+  [website terms of use](https://www.mongodb.com/legal/terms-of-use) limit copying to
+  personal, educational and non-commercial use and restrict automated retrieval.
+  These sources do not fully agree, so read both before running the downloader.
+- **Keep your use personal, educational and non-commercial.** Keep the attribution
+  shown with each answer's cited sources. For any public or commercial deployment,
+  get written permission from MongoDB or replace the corpus with content you own or
+  that is licensed for it.
+
+This section is a good-faith note, not legal advice.
 
 ### Output files
 

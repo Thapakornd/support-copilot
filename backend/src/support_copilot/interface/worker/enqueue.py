@@ -8,6 +8,7 @@ from uuid import UUID
 
 import psycopg
 from pydantic import ValidationError
+
 from support_copilot.application.use_cases.enqueue_embedding import (
     AdmissionError,
     enqueue,

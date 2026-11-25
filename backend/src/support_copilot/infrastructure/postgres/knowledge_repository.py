@@ -5,6 +5,7 @@ import logging
 from uuid import uuid4
 
 from psycopg.types.json import Jsonb
+
 from support_copilot.application.use_cases.enqueue_embedding import (
     AdmissionError,
     AdmissionResult,

@@ -218,9 +218,10 @@ class PostgresEmbeddingStore:
             validate_configuration(conn, config)
 
 
-def validate_configuration(conn, config):
+def validate_configuration(conn, config, *, lock_model=True):
+    query = "SELECT * FROM embedding_models WHERE id=%s"
     model = conn.execute(
-        "SELECT * FROM embedding_models WHERE id=%s FOR SHARE", (config.model_id,)
+        query + " FOR SHARE" if lock_model else query, (config.model_id,)
     ).fetchone()
     if (
         not model

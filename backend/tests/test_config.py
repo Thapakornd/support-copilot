@@ -85,3 +85,50 @@ def test_runtime_settings_from_dotenv(tmp_path, monkeypatch):
 def test_worker_rejects_missing_or_non_postgres_database(url):
     with pytest.raises(ValidationError):
         WorkerSettings(_env_file=None, database_url=url, **worker_values())
+
+
+def test_query_embedding_settings_share_the_worker_configuration_without_worker_credentials(
+    tmp_path, monkeypatch
+):
+    from support_copilot.core.config import EmbeddingSettings
+
+    monkeypatch.setenv("EMBEDDING_DATABASE_URL", "not a PostgreSQL DSN")
+    monkeypatch.setenv("EMBEDDING_HEARTBEAT_SECONDS", "999")
+    env = tmp_path / ".env"
+    env.write_text("EMBEDDING_QUERY_PROMPT='query: '\nEMBEDDING_TARGET_CHARS=750\n")
+    values = worker_values()
+    del values["query_prompt"]
+    query = EmbeddingSettings(_env_file=env, **values)
+    worker = WorkerSettings(
+        _env_file=env,
+        database_url="postgresql://db/worker",
+        heartbeat_seconds=45,
+        **values,
+    )
+    assert query.effective_config().config_hash == worker.effective_config().config_hash
+    assert query.effective_config().query_prompt == "query: "
+    assert query.effective_config().target_chars == 750
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"llm_timeout_seconds": 0},
+        {"chat_candidate_limit": 0},
+        {"chat_max_distance": 2.1},
+        {"chat_max_passages": 0},
+        {"chat_evidence_char_limit": 0},
+    ],
+)
+def test_runtime_rejects_invalid_chat_limits(values):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, **values)
+
+
+def test_demo_auth_defaults_off_and_requires_a_loopback_host():
+    assert Settings(_env_file=None).demo_auth is False
+    for host in ("127.0.0.1", "localhost", "::1"):
+        assert Settings(_env_file=None, demo_auth=True, api_host=host).demo_auth
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, demo_auth=True, api_host="0.0.0.0")
+    assert Settings(_env_file=None, api_host="0.0.0.0").demo_auth is False

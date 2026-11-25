@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import pytest
+
 from support_copilot.application.use_cases.enqueue_embedding import canonical_snapshot
 from support_copilot.domain.embedding_job import ProcessingError, sha256
 

@@ -91,3 +91,24 @@ def config(db):
             (config.model_id, config.model_name, config.model_revision),
         )
     return config
+
+
+@pytest.fixture
+def api(db, monkeypatch):
+    """HTTP client for the real app on a fresh database seeded with the demo people.
+
+    Send identity with headers={"X-Demo-User": "customer" | "mina" | "jordan" |
+    "alex" | "priya" | "sam"}.
+    """
+    from fastapi.testclient import TestClient
+    from pydantic import SecretStr
+
+    from support_copilot.core.config import settings
+    from support_copilot.interface.api.main import app
+
+    root = Path(__file__).resolve().parents[2] / "sql"
+    with psycopg.connect(db) as conn:
+        conn.execute((root / "demo_identities.sql").read_text())
+    monkeypatch.setattr(settings, "database_url", SecretStr(db))
+    monkeypatch.setattr(settings, "demo_auth", True)
+    return TestClient(app)

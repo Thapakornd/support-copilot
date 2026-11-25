@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Support Copilot",
-    "description": "Requests for the current Support Copilot API. Start the backend with `uv run support-copilot` from backend/. Set base_url to match API_HOST/API_PORT. Health requires no external services. Chat requires LLM_PROVIDER, LLM_MODEL, and ANTHROPIC_API_KEY in backend/.env; it does not use retrieval yet. No API authentication is currently required.",
+    "description": "Requests for the current Support Copilot API. Start the backend with `uv run support-copilot` from backend/. Set base_url to match API_HOST/API_PORT. Health requires no external services. Chat requires published knowledge, matching embedding settings, database access and a configured generation provider. Chat needs no authentication. The other endpoints need DEMO_AUTH=true and an X-Demo-User header (demo_user variable).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -9,7 +9,10 @@
       "key": "base_url",
       "value": "http://127.0.0.1:8000",
       "type": "string"
-    }
+    },
+    { "key": "demo_user", "value": "customer", "type": "string" },
+    { "key": "article_id", "value": "", "type": "string" },
+    { "key": "ticket_id", "value": "SC-1", "type": "string" }
   ],
   "item": [
     {
@@ -46,7 +49,7 @@
           "options": { "raw": { "language": "json" } }
         },
         "url": "{{base_url}}/chat",
-        "description": "Send the required question field. The optional category defaults to null. Calls the configured LLM and may incur provider charges. Expected response: 200 with an answer string."
+        "description": "Send the required question field. The optional category defaults to null. A grounded response may incur provider charges. Expected response: 200 with answer, status and sources."
       },
       "event": [
         {
@@ -74,7 +77,7 @@
           "options": { "raw": { "language": "json" } }
         },
         "url": "{{base_url}}/chat",
-        "description": "Send a question with the optional category string. The current chat implementation does not use retrieval. Calls the configured LLM and may incur provider charges. Expected response: 200 with an answer string."
+        "description": "Send a question with the optional category string. The category scopes the publication search. A grounded response may incur provider charges. Expected response: 200 with answer, status and sources."
       },
       "event": [
         {
@@ -84,6 +87,408 @@
             "exec": [
               "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
               "pm.test('Response contains an answer string', function () { pm.expect(pm.response.json().answer).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Me",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/me",
+        "description": "Signed-in user: name, email, company, role. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Agents (agent only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/agents",
+        "description": "Active agent names, sorted. Set demo_user to alex; a customer gets 403. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile - get",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/profile",
+        "description": "Profile with notification preferences. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile - save",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/profile",
+        "description": "Replace the profile. Set demo_user to customer; the body shows the full shape. Unknown timezone returns 422. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Demo customer\",\n  \"email\": \"customer@demo.test\",\n  \"company\": \"Demo Org\",\n  \"timezone\": \"Asia/Bangkok\",\n  \"phone\": \"\",\n  \"notify\": {\n    \"replies\": true,\n    \"status\": true,\n    \"digest\": false\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Team (customer only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/team",
+        "description": "Active members of the caller's account. An agent gets 403. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Articles - list",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/articles",
+        "description": "Active knowledge articles, newest first. updated is ISO 8601. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Articles - search",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/articles/search?q=connection timeout&topic=connectivity",
+        "description": "Full-text search matching any word, best first, at most 50. topic is optional; a blank q lists articles. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Articles - get",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/articles/{{article_id}}",
+        "description": "One article with markdown content and sourceUrl. Set article_id to an id from the list; unknown ids return 404. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets - list",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/tickets",
+        "description": "Customers see their account's tickets (403 without an active membership); agents see all. Newest updated first. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets - create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/tickets",
+        "description": "Customer only (agents 403; members without can_open_cases, e.g. jordan, 403). consent must be true. Unknown category 422; unknown source ids keep the title and drop the id. Copy the returned id into the ticket_id variable. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Cannot connect to the cluster\",\n  \"category\": \"connectivity\",\n  \"severity\": \"High\",\n  \"description\": \"Connections time out.\",\n  \"sources\": [\n    {\n      \"title\": \"Troubleshoot connection issues\",\n      \"url\": \"https://example.org/a\"\n    }\n  ],\n  \"aiAnswer\": \"Check the access list.\",\n  \"consent\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets - get",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/tickets/{{ticket_id}}",
+        "description": "One ticket with comments and sources. Ids are SC-<number>; malformed ids and tickets in another account return 404. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets - take",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          }
+        ],
+        "url": "{{base_url}}/tickets/{{ticket_id}}/take",
+        "description": "Agent only. Succeeds only when unassigned and Submitted, In progress or Waiting for customer (else 409). Sets the assignee and In progress. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets - reply",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/tickets/{{ticket_id}}/replies",
+        "description": "Agents may send a status; the first agent reply on an unassigned ticket assigns it. Customers (reporter only) must not send status; a reply on Waiting for customer or Resolved reopens to In progress. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"body\": \"Thanks, looking into it.\",\n  \"status\": \"Waiting for customer\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets - patch",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "X-Demo-User",
+            "value": "{{demo_user}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/tickets/{{ticket_id}}",
+        "description": "Send at least one of status, assignee (agent display name; null or \"\" unassigns), severity. Customers (reporter only) may only send status Resolved, or Submitted to reopen a resolved case. Needs DEMO_AUTH=true on a loopback API_HOST and `sql/demo_identities.sql` applied; set the demo_user collection variable.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"In progress\",\n  \"assignee\": \"Alex Chen\",\n  \"severity\": \"High\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
         }

@@ -3,6 +3,7 @@ from threading import Event
 from uuid import uuid4
 
 import pytest
+
 from support_copilot.domain.embedding_job import (
     EmbeddingConfig,
     EmbeddingJob,

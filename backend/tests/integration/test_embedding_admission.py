@@ -3,6 +3,7 @@ from dataclasses import replace
 import psycopg
 import pytest
 from psycopg.types.json import Jsonb
+
 from support_copilot.domain.embedding_job import ProcessingError
 from support_copilot.infrastructure.postgres.knowledge_repository import (
     KnowledgeRepository,

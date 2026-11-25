@@ -11,11 +11,13 @@ class Database:
         self.dsn = dsn
 
     @contextmanager
-    def transaction(self):
+    def transaction(self, *, read_only: bool = False):
         with psycopg.connect(
             self.dsn,
             row_factory=dict_row,
             connect_timeout=10,
             options="-c statement_timeout=15000 -c lock_timeout=5000",
         ) as conn:
+            if read_only:
+                conn.read_only = True
             yield conn

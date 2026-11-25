@@ -1,6 +1,9 @@
 """Shared query/document encoder with explicit prompts and pinned local artifacts."""
 
+import math
+
 from support_copilot.domain.embedding_job import ProcessingError, validate_vectors
+
 
 class SentenceTransformerEncoder:
     def __init__(self, config, *, device="cpu", batch_size=32, offline=True):
@@ -57,13 +60,19 @@ class SentenceTransformerEncoder:
                 prompt=self.config.query_prompt
                 if query
                 else self.config.document_prompt,
-                normalize_embeddings=True,
+                normalize_embeddings=False,
                 batch_size=self.batch_size,
                 show_progress_bar=False,
                 convert_to_numpy=True,
             ).tolist()
         except (MemoryError, RuntimeError):
             raise ProcessingError("encoding_resource", retryable=True) from None
+
+        # Normalize Python floats so float16 model output meets the unit-norm check.
+        for index, vector in enumerate(result):
+            norm = math.hypot(*vector)
+            if norm > 0 and math.isfinite(norm):
+                result[index] = [value / norm for value in vector]
         validate_vectors(result, len(texts), self.config.dimensions)
         return result
 

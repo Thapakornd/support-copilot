@@ -2,11 +2,12 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+from test_processing import config
+
 from support_copilot.domain.embedding_job import ProcessingError
 from support_copilot.infrastructure.embeddings.sentence_transformer import (
     SentenceTransformerEncoder,
 )
-from test_processing import config
 
 
 def test_pinned_offline_encoder_counts_prompts_once_and_reuses_model(monkeypatch):
@@ -48,6 +49,26 @@ def test_pinned_offline_encoder_counts_prompts_once_and_reuses_model(monkeypatch
     assert calls[0][1]["trust_remote_code"] is False
     with pytest.raises(ProcessingError, match="oversized_block"):
         encoder.encode_documents(["x" * 100])
+
+
+def test_encoder_normalizes_float16_vectors_before_validation(monkeypatch):
+    encoder = SentenceTransformerEncoder(config())
+    # 0.5771484375 is 1/sqrt(3) rounded to float16.
+    half_precision_vector = [0.5771484375] * 3
+    monkeypatch.setattr(
+        encoder,
+        "_model",
+        SimpleNamespace(
+            tokenizer=lambda *args, **kwargs: {"input_ids": [0]},
+            encode_document=lambda *args, **kwargs: SimpleNamespace(
+                tolist=lambda: [half_precision_vector.copy()]
+            ),
+        ),
+    )
+
+    [vector] = encoder.encode_documents(["body"])
+
+    assert vector == pytest.approx([3**-0.5] * 3)
 
 
 def test_missing_offline_model_returns_safe_actionable_code(monkeypatch):

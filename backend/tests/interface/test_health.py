@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+
 from support_copilot.interface.api.main import app
 
 

@@ -1,5 +1,6 @@
 import pytest
 from pydantic import ValidationError
+
 from support_copilot.core.config import WorkerSettings
 from support_copilot.interface.worker.enqueue import main as enqueue_main
 from support_copilot.interface.worker.main import main as worker_main

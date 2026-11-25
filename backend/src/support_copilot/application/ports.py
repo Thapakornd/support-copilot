@@ -6,10 +6,24 @@ from support_copilot.domain.embedding_job import (
     QueueObservation,
     RecoveryResult,
 )
+from support_copilot.domain.entities import (
+    EvidencePassage,
+    GenerationResult,
+    RetrievedPassage,
+)
 
 
 class LLMPort(Protocol):
-    def answer(self, question: str) -> str: ...
+    def answer(
+        self, question: str, passages: tuple[EvidencePassage, ...]
+    ) -> GenerationResult: ...
+
+
+class RetrieverPort(Protocol):
+    def resolve_category(self, category: str) -> str | None: ...
+    def retrieve(
+        self, vector: list[float], category: str | None, limit: int
+    ) -> list[RetrievedPassage]: ...
 
 
 class EncoderPort(Protocol):
