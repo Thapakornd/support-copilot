@@ -12,7 +12,7 @@ Source: `frontend/src`. Last updated 2026-11-10.
 | Feature areas | **4**: assistant, knowledge base, cases, account |
 | Features (things a user can do) | **17**, plus 1 demo-only role switch |
 | Shared widgets | 3: Header, Footer, CaseTable |
-| Backend endpoints the frontend needs | **15**: 1 exists today, 14 still run on browser-side demo code |
+| Backend endpoints the frontend needs | **15**: all exist and the frontend calls all of them |
 | User roles | 2: `customer`, `agent` (support engineer) |
 
 ## Roles
@@ -86,10 +86,10 @@ Extra routes that aren't pages:
 - **Backend calls:** none. Categories are a fixed list in `shared/config/categories.ts`.
 
 ### 2. Ask: `/help/:category`
-- **Shows:** a question box, the AI answer with its top 3 referenced articles, a paged list of related articles, and a "Create a case" button.
+- Shows a question box, the answer and its cited source sections, related articles, and a "Create a case" button. When evidence is insufficient, the assistant asks for more detail.
 - **Features:** Ask the assistant, Rate the answer, Create a case (starting point).
-- **Backend calls:** `GET /articles` (to count the articles in this area), `GET /articles/search`, `POST /chat`.
-- **When the backend is offline:** the page shows the excerpts of the top 3 matching articles as the answer, tagged "Demo · backend offline".
+- Calls `POST /chat` for the answer and searches separately for related articles.
+- A service error offers retry for the submitted question.
 
 ### 3. Knowledge base: `/kb`
 - **Shows:** a search box; filters for Type, Product and Topic with counts; and the results. With no search or filter, it shows recently published articles.
@@ -159,7 +159,7 @@ The code is in `frontend/src/features/<area>/`. Every backend call goes through 
 | # | Feature | What it does | Backend |
 |---|---|---|---|
 | 1 | Pick category | Narrows the AI search to one area before the question is asked | none |
-| 2 | Ask the assistant | Searches the area's articles, then asks the AI; uses an offline fallback answer if the backend is down | `GET /articles/search`, `POST /chat` |
+| 2 | Ask the assistant | Answers from published passages and displays the cited sections or a clarifying question | `GET /articles/search`, `POST /chat` |
 | 3 | Rate the answer | Thumbs up or down on the AI answer | **not saved yet**: needs an endpoint (see Gaps) |
 
 ### Knowledge base (2): `features/knowledge-base/`
@@ -202,30 +202,34 @@ The code is in `frontend/src/features/<area>/`. Every backend call goes through 
 
 The status column means:
 - **Exists:** the backend has it today.
-- **Demo:** the frontend currently fakes it in the browser (`frontend/src/shared/api/demo/`).
+- **Demo:** the frontend fakes it in the browser (none today).
 
 Paths marked *proposed* are the frontend's suggestion. If the backend picks different paths, only the matching function in `frontend/src/shared/api/*.ts` has to change.
 
 | # | Method and path | Status | Request | Response | Frontend function |
 |---|---|---|---|---|---|
-| 1 | `POST /chat` | **Exists** | `{ question: string, category: string \| null }` | `{ answer: string }` | `askChat` (`chat.ts`) |
-| 2 | `GET /me` *proposed* | Demo | | `Me` | `getMe` (`users.ts`) |
-| 3 | `GET /agents` *proposed* | Demo | | `string[]` (agent names) | `listAgents` (`users.ts`) |
-| 4 | `GET /profile` *proposed* | Demo | | `Profile` | `getProfile` (`profile.ts`) |
-| 5 | `PUT /profile` *proposed* | Demo | `Profile` | `Profile` | `saveProfile` (`profile.ts`) |
-| 6 | `GET /team` *proposed* | Demo | | `TeamMember[]` | `listTeam` (`profile.ts`) |
-| 7 | `GET /articles` *proposed* | Demo | | `Article[]` | `listArticles` (`articles.ts`) |
-| 8 | `GET /articles/:id` *proposed* | Demo | | `ArticleDetail`, or 404 | `getArticle` (`articles.ts`) |
-| 9 | `GET /articles/search?q=&topic=` *proposed* | Demo | | `Article[]`, ranked best first | `searchArticles` (`articles.ts`) |
-| 10 | `GET /tickets` *proposed* | Demo | | `Ticket[]` | `listTickets` (`tickets.ts`) |
-| 11 | `GET /tickets/:id` *proposed* | Demo | | `Ticket`, or 404 | `getTicket` (`tickets.ts`) |
-| 12 | `POST /tickets` *proposed* | Demo | `NewTicket` | `Ticket` | `createTicket` (`tickets.ts`) |
-| 13 | `PATCH /tickets/:id` *proposed* | Demo | `TicketPatch` | `Ticket` | `updateTicket` (`tickets.ts`) |
-| 14 | `POST /tickets/:id/take` *proposed* | Demo | | `Ticket` | `takeTicket` (`tickets.ts`) |
-| 15 | `POST /tickets/:id/replies` *proposed* | Demo | `{ body: string, status?: Status }` | `Ticket` | `replyToTicket` (`tickets.ts`) |
+| 1 | `POST /chat` | **Exists** | `{ question: string, category: string \| null }` | Answer text, status and ordered sources | `askChat` (`chat.ts`) |
+| 2 | `GET /me` | **Exists** | | `Me` | `getMe` (`users.ts`) |
+| 3 | `GET /agents` (agents only) | **Exists** | | `string[]` (agent names) | `listAgents` (`users.ts`) |
+| 4 | `GET /profile` | **Exists** | | `Profile` | `getProfile` (`profile.ts`) |
+| 5 | `PUT /profile` | **Exists** | `Profile` | `Profile` | `saveProfile` (`profile.ts`) |
+| 6 | `GET /team` (customers only) | **Exists** | | `TeamMember[]` | `listTeam` (`profile.ts`) |
+| 7 | `GET /articles` | **Exists** | | `Article[]` | `listArticles` (`articles.ts`) |
+| 8 | `GET /articles/:id` | **Exists** | | `ArticleDetail`, or 404 | `getArticle` (`articles.ts`) |
+| 9 | `GET /articles/search?q=&topic=` | **Exists** | | `Article[]`, ranked best first | `searchArticles` (`articles.ts`) |
+| 10 | `GET /tickets` | **Exists** | | `Ticket[]` | `listTickets` (`tickets.ts`) |
+| 11 | `GET /tickets/:id` | **Exists** | | `Ticket`, or 404 | `getTicket` (`tickets.ts`) |
+| 12 | `POST /tickets` | **Exists** | `NewTicket` | `Ticket` | `createTicket` (`tickets.ts`) |
+| 13 | `PATCH /tickets/:id` | **Exists** | `TicketPatch` | `Ticket` | `updateTicket` (`tickets.ts`) |
+| 14 | `POST /tickets/:id/take` | **Exists** | | `Ticket` | `takeTicket` (`tickets.ts`) |
+| 15 | `POST /tickets/:id/replies` | **Exists** | `{ body: string, status?: Status }` | `Ticket` | `replyToTicket` (`tickets.ts`) |
 
 Notes:
-- **`POST /chat` `category`** receives the display name, for example `"Connectivity"`, not the id `"connectivity"`. It's `null` when the user picked "None of the above".
+- **Tickets (rows 10 to 15):** `id` is `SC-<case number>`. Case ids that are malformed or too large return 404, never 500. Lists and single reads use a fixed number of queries. Reads: customers see their account's tickets (403 without an active membership; another account's ticket is 404), agents see all. Writes lock the ticket row and commit the ticket and its comments together; a patch that changes nothing returns the ticket untouched. Check order: 401, role 403, 404, ownership 403, then 409/422 on state. `POST /tickets` needs `consent: true`, returns 201, and stores `consent_at` with the version `case-share-v1`; members with `can_open_cases=false` get 403. `assignee` is an agent display name that must match exactly one active agent (otherwise 422); `null` or `""` unassigns and a missing field leaves it unchanged. `PATCH {}` and a null `status` or `severity` are 422. Only the reporter replies, resolves or reopens; other members of the account can read. Reopen (`Submitted`) is valid only from `Resolved`, else 409. Take is 409 unless the ticket is unassigned and Submitted, In progress or Waiting for customer; two simultaneous takers get one 200 and one 409.
+- **Identity (rows 2 to 9):** there is no login yet. The role toggle sends `X-Demo-User: customer` or `alex` (`shared/api/identity.ts`); `mina`, `jordan`, `priya` and `sam` also exist. The backend honours it only with `DEMO_AUTH=true` on a loopback `API_HOST`; otherwise these endpoints return 401. Errors are `{"detail": ...}`: 401 no valid user, 403 wrong role, 404 missing, 422 invalid input, 503 database unavailable.
+- **Articles:** `updated` is ISO 8601. `content` (markdown) and `sourceUrl` come with `GET /articles/:id`; `body` appears only when the stored article has `{steps, note?}` steps. Excerpts are plain text. Search matches any query word, ranks best first (title above body) and returns at most 50.
+- `GET /agents` is agent-only, so the case page only loads it for agents. `GET /team` is customer-only.
+- The Ask page sends the category ID, for example `"connectivity"`, or `null` for "None of the above". The API also accepts legacy display labels.
 - **Every ticket write returns the full updated `Ticket`.** The frontend puts it straight into its cache and refreshes the case lists.
 - **404 for a missing ticket or article:** the frontend shows its "not found" screen when these functions return `null`. When you wire up the real call, map a 404 to `null` in that function.
 - **Errors:** any non-2xx response throws in `shared/api/client.ts`. The page that made the call decides what to show.
@@ -253,25 +257,27 @@ type Ticket = {
   summary: string
   description?: string
   reporter: string      // customer name
-  sources: { id?: string; title: string }[]  // articles the AI used; id is missing if the article was removed
+  company: string       // account name (fills the case sidebar)
+  plan: string          // account plan code, e.g. "developer"
+  sources: { id?: string; title: string; url?: string }[]  // articles the AI used; id is missing if the article was removed or unknown
   aiAnswer?: string     // AI answer the customer saw before escalating
   assignee?: string     // agent name; missing = unassigned
   comments: Comment[]   // oldest first
 }
 type Comment = { author: string; role: 'customer' | 'agent' | 'system'; at: string; body: string }
 
-type NewTicket = { title: string; category: string; severity: Severity; description?: string; sources: { id?: string; title: string }[]; aiAnswer?: string }
-type TicketPatch = { status?: Status; assignee?: string; severity?: Severity }  // assignee missing or empty = unassign
+type NewTicket = { title: string; category: string; severity: Severity; description?: string; sources?: { id?: string; title: string; url?: string }[]; aiAnswer?: string; consent: true }  // consent is required; the server stores consent_at and "case-share-v1"
+type TicketPatch = { status?: Status; assignee?: string | null; severity?: Severity }  // assignee null or "" = unassign; missing = unchanged; at least one field; status/severity cannot be null
 
 type Article = {
   id: string; title: string
   type: 'Knowledge Article' | 'Documentation' | 'Community Forum' | 'Video'
   product: 'Atlas' | 'Server' | 'Drivers' | 'Ops Manager'
   topic: string         // category id
-  updated: string       // display text today, e.g. "2 days ago"
+  updated: string       // ISO 8601 with offset, e.g. "2026-11-16T00:00:00Z"
   excerpt: string
 }
-type ArticleDetail = Article & { body?: { steps: string[]; note?: string } }
+type ArticleDetail = Article & { content: string; sourceUrl: string; body?: { steps: string[]; note?: string } }  // content is markdown
 
 type Profile = {
   name: string; email: string; company: string; timezone: string; phone: string
@@ -282,37 +288,37 @@ type TeamMember = { name: string; email: string; role: string; cases: boolean }
 
 ## Business rules the backend must own
 
-Today the frontend fakes these in `frontend/src/shared/api/demo/tickets.ts`. Once the real endpoints exist, the backend is the only place these rules should live.
+The backend owns these rules (`backend/src/support_copilot/application/ticket_rules.py`, pure functions). Where the 2026-11-25 frontend-APIs spec decides differently from the text below, the spec wins and the text below says so.
 
 ### Permissions
 | Action | customer | agent |
 |---|---|---|
 | Read tickets | own account's only | all |
-| Create ticket | ✓ | |
-| Reply | own tickets | any ticket |
+| Create ticket | ✓ (membership must allow opening cases) | |
+| Reply | tickets they reported (other members of the account only read) | any ticket |
 | Take ticket | | ✓ (unassigned and open only) |
 | Change assignee or severity | | ✓ |
-| Change status | only to `Resolved` (mark resolved) or `Submitted` (reopen), on own tickets | any status |
+| Change status | only to `Resolved` (mark resolved) or `Submitted` (reopen, from `Resolved` only), on tickets they reported | any status |
 | Read agents list | | ✓ |
 | Read team / subscription | ✓ | |
 
 ### What each write does
 - **Create** (`POST /tickets`):
-  - The server generates `id`, sets `status = Submitted`, sets `created` and `updated` to now, and sets `reporter` from the signed-in user.
+  - Requires `consent: true`. The server generates `id`, sets `status = Submitted`, sets `created` and `updated` to now, and sets `reporter` from the signed-in user.
   - It takes `summary` from the first 200 characters of `description`.
   - It adds the system comment "Escalated after the AI suggestion did not help" when `aiAnswer` is present, and "Case opened" otherwise.
 - **Take** (`POST /tickets/:id/take`): sets `assignee = me` and `status = In progress`, and adds the system comment "*{name}* took the case".
 - **Reply** (`POST /tickets/:id/replies`):
-  - Adds a comment whose author is the signed-in user and whose role is that user's role. When an agent replies on an assigned ticket, the author is the assignee.
-  - **Agent reply:** the status becomes the `status` sent with the request. If the ticket was unassigned, it's also assigned to the agent.
-  - **Customer reply:** a ticket in `Waiting for customer` or `Resolved` moves back to `In progress`. Any other status stays as it is.
-  - If the status changed, it adds the system comment "Status changed to *{status}*".
-- **Update** (`PATCH /tickets/:id`): adds one system comment per field that actually changed:
+  - Adds a comment whose author is the signed-in user and whose role is that user's role. The author is always the signed-in user, never the assignee (this replaces the demo behaviour of using the assignee).
+  - **Agent reply:** the status becomes the `status` sent with the request, or stays unchanged when none is sent. If the ticket was unassigned, it's also assigned to the agent.
+  - **Customer reply:** sending `status` is 403. A ticket in `Waiting for customer` or `Resolved` moves back to `In progress`. Any other status stays as it is.
+  - The reply comes first; if the status changed, the system comment "Status changed to *{status}*" follows it. Assigning an unassigned ticket on an agent reply adds no event.
+- **Update** (`PATCH /tickets/:id`): a missing field is unchanged (the older "missing assignee = unassign" rule is replaced by `null` or `""`). Adds one system comment per field that actually changed, in this order:
   - Status changed by an agent: "Status changed to *{status}*".
   - Status changed by a customer: "Customer marked the case resolved" or "Customer reopened the case".
   - Assignee: "Assigned to *{name}*", or "Unassigned".
   - Severity: "Severity changed to *{severity}*".
-- **Every write** updates `updated` to now.
+- **Every effective write** updates `updated` to now, increments the ticket `version`, and keeps `resolved_at` set exactly while the status is `Resolved` (the original value is kept when it was already resolved). A write that changes nothing changes neither `updated` nor `version`.
 
 ### Response-time targets (shown on the Subscription tab)
 | Severity | First response target |
@@ -324,12 +330,12 @@ Today the frontend fakes these in `frontend/src/shared/api/demo/tickets.ts`. Onc
 
 ## Gaps and open questions for the backend
 
-1. **Login / `GET /me`:** nothing exists yet. Until it does, the header role switch fakes the signed-in user.
+1. **Login:** `GET /me` exists, but identity is the `X-Demo-User` demo header (`DEMO_AUTH`). Real login should replace the one `current_user` dependency.
 2. **Feedback votes aren't saved.** The AI answer vote (Ask page) and the article "Was this helpful?" vote are only kept on screen. A possible endpoint is `POST /feedback { target: 'answer' | 'article', id, vote: 'up' | 'down' }`.
-3. **Article `updated`** is display text ("2 days ago"). An ISO timestamp would be better; the frontend can format it.
-4. **Account info on the case sidebar** shows "Demo Org" and "Developer" as fixed text. `Ticket` could include the reporter's company and plan.
-5. **Timestamps:** please return ISO 8601 timestamps with a timezone (for example `2026-11-09T11:08:00Z`). The demo saves UTC times without one, so they display a few hours off.
-6. **`Draft` status** is defined but nothing creates it. Keep it only if drafts are planned.
+3. **Article `updated`** resolved. It is an ISO 8601 timestamp; the knowledge base shows the 10 newest articles as recent.
+4. **Account info on the case sidebar:** resolved. `Ticket` now carries `company` and `plan` (the plan code, e.g. `developer`); the sidebar shows both. The Subscription tab's plan is still fixed text, because no endpoint returns the account.
+5. **Timestamps:** resolved for the ticket endpoints, which return ISO 8601 timestamps with an offset (for example `2026-11-09T11:08:00Z`).
+6. **`Draft` status** is defined but nothing creates it. Keep it only if drafts are planned. The API accepts it from agents; `take` answers 409 for a draft.
 7. **Categories** are a fixed list in the frontend. Move them to `GET /categories` if they ever need to be editable.
 
 ## Where the frontend code lives
@@ -341,6 +347,6 @@ frontend/src/
   widgets/              Header, Footer, CaseTable
   features/             assistant, knowledge-base, cases, account
   shared/api/           one file per backend resource, the only code that calls the backend
-  shared/api/demo/      browser-side stand-ins; delete each part when its endpoint ships
+  shared/api/identity.ts  the demo user behind the role toggle; replace with real login
   shared/api/queries.ts cache keys used for loading and refreshing data
 ```
